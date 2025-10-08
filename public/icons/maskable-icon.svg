@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#120a1f" />
+  <circle cx="40" cy="40" r="30" fill="#e8e0ff" />
+  <path
+    d="M60 20 q15 15 0 40 q10 -5 15 -15 q5 -15 -15 -25"
+    fill="#1c0f35"
+  />
+  <path
+    d="M25 70 q10 10 25 10 q20 0 30 -15 q-20 5 -35 -5 q-10 10 -20 10"
+    fill="#3b1d5c"
+  />
+</svg>
