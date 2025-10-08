@@ -12,42 +12,43 @@ const packageJson = JSON.parse(
 );
 
 const appVersion = packageJson.version;
+const canonicalBasePath = '/hallowmoon/';
 
 export default defineConfig({
-  base: '/hallowmoon/',
+  base: './',
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['offline.html'],
       manifest: {
-        id: '/hallowmoon/',
+        id: canonicalBasePath,
         name: 'HallowMoon',
         short_name: 'HallowMoon',
-        start_url: '/hallowmoon/',
-        scope: '/hallowmoon/',
+        start_url: './',
+        scope: './',
         display: 'standalone',
         background_color: '#0b0614',
         theme_color: '#2d174d',
         description: 'Offline mythical training and battles.',
         icons: [
           {
-            src: '/hallowmoon/icons/maskable-icon.svg',
+            src: 'icons/icon.svg',
             sizes: '192x192',
             type: 'image/svg+xml',
-            purpose: 'any maskable'
+            purpose: 'any'
           },
           {
-            src: '/hallowmoon/icons/icon.svg',
+            src: 'icons/maskable-icon.svg',
             sizes: '512x512',
             type: 'image/svg+xml',
-            purpose: 'any'
+            purpose: 'any maskable'
           }
         ]
       },
       workbox: {
         cacheId: `hallowmoon-${appVersion}`,
-        navigateFallback: '/hallowmoon/offline.html',
+        navigateFallback: 'offline.html',
         cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,ico,svg,webmanifest}']
       }

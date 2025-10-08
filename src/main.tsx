@@ -18,9 +18,33 @@ const updateSW = registerSW({
   }
 });
 
+function resolveBasename(): string {
+  const baseFromEnv = import.meta.env.BASE_URL ?? '/';
+  if (baseFromEnv !== '/' && baseFromEnv !== './') {
+    return baseFromEnv.endsWith('/') ? baseFromEnv.slice(0, -1) : baseFromEnv;
+  }
+
+  const path = window.location.pathname;
+  const target = '/hallowmoon';
+  const lowerPath = path.toLowerCase();
+  const index = lowerPath.indexOf(target);
+
+  if (index >= 0) {
+    const match = path.slice(0, index + target.length);
+    return match.endsWith('/') ? match.slice(0, -1) : match;
+  }
+
+  const segments = path.split('/').filter(Boolean);
+  if (segments.length > 0) {
+    return `/${segments[0]}`;
+  }
+
+  return '';
+}
+
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <BrowserRouter basename="/hallowmoon">
+    <BrowserRouter basename={resolveBasename()}>
       <GameProvider>
         <App />
       </GameProvider>
