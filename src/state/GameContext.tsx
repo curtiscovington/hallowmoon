@@ -229,6 +229,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           heroAgiMod: 0,
           enemyStrMod: 0,
           enemyAgiMod: 0,
+          heroStatuses: [],
+          enemyStatuses: [],
+          pendingActions: [],
           log: [
             `${enemy.name} appears amidst the shadows.`,
             ...(heroTurn === 'enemy'
@@ -281,6 +284,35 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     } satisfies GameState;
   }, []);
 
+  const queueEnemyTurn = React.useCallback(() => {
+    setTimeout(() => {
+      updateState((latest) => {
+        if (!latest.hero || latest.view !== 'battle' || !latest.battle) {
+          return latest;
+        }
+        if (latest.battle.turn !== 'enemy') {
+          return latest;
+        }
+        const enemyTurn = applyEnemyTurn(latest.battle, latest.hero);
+        const heroAfterEnemy: Hero = {
+          ...latest.hero,
+          currentHp: enemyTurn.heroHp
+        };
+        if (enemyTurn.heroHp <= 0) {
+          return resolveDefeat(heroAfterEnemy);
+        }
+        if (enemyTurn.battle.enemyHp <= 0) {
+          return resolveVictory(latest, heroAfterEnemy, enemyTurn.battle);
+        }
+        return {
+          ...latest,
+          hero: heroAfterEnemy,
+          battle: enemyTurn.battle
+        };
+      });
+    }, 450);
+  }, [resolveDefeat, resolveVictory, updateState]);
+
   const performHeroMove = React.useCallback(
     (moveKey: string) => {
       updateState((current) => {
@@ -300,18 +332,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           return resolveVictory(current, heroAfterHero, afterHero);
         }
         if (afterHero.turn === 'enemy') {
-          const enemyTurn = applyEnemyTurn(afterHero, heroAfterHero);
-          const heroAfterEnemy = {
-            ...heroAfterHero,
-            currentHp: enemyTurn.heroHp
-          };
-          if (enemyTurn.heroHp <= 0) {
-            return resolveDefeat(heroAfterEnemy);
-          }
+          queueEnemyTurn();
           return {
             ...current,
-            hero: heroAfterEnemy,
-            battle: enemyTurn.battle
+            hero: heroAfterHero,
+            battle: afterHero
           };
         }
         return {
@@ -321,7 +346,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         };
       });
     },
-    [resolveDefeat, resolveVictory, updateState]
+    [queueEnemyTurn, resolveVictory, updateState]
   );
 
   const retreat = React.useCallback(() => {

@@ -22,6 +22,7 @@ export interface BattleMove {
   name: string;
   description: string;
   type: 'attack' | 'buff' | 'special' | 'debuff';
+  chargeTurns?: number;
 }
 
 export interface EnemyMove {
@@ -30,6 +31,27 @@ export interface EnemyMove {
   description: string;
   type: 'attack' | 'debuff';
   scale: 'str' | 'wis';
+  windUpTurns?: number;
+}
+
+export interface BattleStatus {
+  key: string;
+  label: string;
+  description: string;
+  type: 'buff' | 'debuff';
+  remainingTurns: number;
+  modifiers?: Partial<Record<'str' | 'agi' | 'wis', number>>;
+  justApplied?: boolean;
+}
+
+export interface PendingAction {
+  owner: 'hero' | 'enemy';
+  key: string;
+  name: string;
+  description: string;
+  remainingTurns: number;
+  totalTurns: number;
+  payload?: Record<string, number>;
 }
 
 export interface Enemy {
@@ -55,6 +77,9 @@ export interface BattleState {
   heroAgiMod: number;
   enemyStrMod: number;
   enemyAgiMod: number;
+  heroStatuses: BattleStatus[];
+  enemyStatuses: BattleStatus[];
+  pendingActions: PendingAction[];
   log: string[];
   turn: 'hero' | 'enemy';
 }
