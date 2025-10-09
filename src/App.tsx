@@ -3,6 +3,7 @@ import { BattleView } from './components/BattleView';
 import { CharacterCreation } from './components/CharacterCreation';
 import { Header } from './components/Header';
 import { MessageBanner } from './components/MessageBanner';
+import { MoonlitMarket } from './components/MoonlitMarket';
 import { StatsPanel } from './components/StatsPanel';
 import { TrainingGround } from './components/TrainingGround';
 import { WorldMap } from './components/WorldMap';
@@ -26,6 +27,13 @@ function GameScreen() {
     content = (
       <>
         <TrainingGround />
+        <StatsPanel />
+      </>
+    );
+  } else if (state.view === 'market') {
+    content = (
+      <>
+        <MoonlitMarket />
         <StatsPanel />
       </>
     );

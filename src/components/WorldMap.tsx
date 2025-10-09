@@ -1,7 +1,7 @@
 import { useGame } from '../state/GameContext';
 
 export function WorldMap() {
-  const { startBattle, startTraining, rest } = useGame();
+  const { startBattle, startTraining, rest, visitMarket } = useGame();
 
   const nodes = [
     {
@@ -10,7 +10,8 @@ export function WorldMap() {
       description: 'Home base for weary hunters. Recover and hone your craft.',
       actions: [
         { label: 'Train Stats', onClick: startTraining },
-        { label: 'Rest & Recover', onClick: rest }
+        { label: 'Rest & Recover', onClick: rest },
+        { label: 'Visit Moonlit Market', onClick: visitMarket }
       ]
     },
     {
