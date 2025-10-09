@@ -13,6 +13,8 @@ import {
   GameState,
   Hero,
   LocationKey,
+  MarketItem,
+  MarketItemKey,
   Species,
   TrainableStat
 } from './types';
@@ -24,6 +26,8 @@ interface GameContextValue {
   startTraining: () => void;
   train: (stat: TrainableStat) => void;
   rest: () => void;
+  visitMarket: () => void;
+  buyFromMarket: (itemKey: MarketItemKey) => void;
   startBattle: (location: LocationKey) => void;
   performHeroMove: (moveKey: string) => void;
   retreat: () => void;
@@ -37,8 +41,78 @@ const defaultState: GameState = {
   view: 'create',
   location: 'village',
   battle: null,
-  message: null
+  message: null,
+  marketInventory: []
 };
+
+type MarketEffectResult = { hero: Hero; message: string };
+type MarketEffect = (hero: Hero) => MarketEffectResult;
+
+const MARKET_CATALOG: Record<MarketItemKey, MarketItem & { apply: MarketEffect }> = {
+  'moon-tonic': {
+    key: 'moon-tonic',
+    name: 'Moon Tonic',
+    description: 'Brewed silverleaf restores your vitality and spirit instantly.',
+    cost: 12,
+    apply: (hero) => ({
+      hero: { ...hero, currentHp: hero.maxHp, energy: hero.maxEnergy },
+      message: 'You feel moonlight flood your veins. HP and energy fully restored.'
+    })
+  },
+  'silvered-armaments': {
+    key: 'silvered-armaments',
+    name: 'Silvered Armaments',
+    description: 'Refined blades tuned by hunters grant +1 STR and +1 AGI.',
+    cost: 20,
+    apply: (hero) => ({
+      hero: { ...hero, str: hero.str + 1, agi: hero.agi + 1 },
+      message: 'Steel sings in your grip. Strength and agility rise by 1.'
+    })
+  },
+  'occult-primer': {
+    key: 'occult-primer',
+    name: 'Occult Primer',
+    description: 'Esoteric study increases your WIS by 1 and max energy by 1.',
+    cost: 18,
+    apply: (hero) => {
+      const maxEnergy = hero.maxEnergy + 1;
+      return {
+        hero: { ...hero, wis: hero.wis + 1, maxEnergy, energy: maxEnergy },
+        message: 'Mystic insights bloom. Wisdom and max energy each increase by 1.'
+      };
+    }
+  },
+  'lunar-wardstone': {
+    key: 'lunar-wardstone',
+    name: 'Lunar Wardstone',
+    description: 'Carved wards grant +10 max HP and mend your wounds.',
+    cost: 16,
+    apply: (hero) => {
+      const maxHp = hero.maxHp + 10;
+      return {
+        hero: { ...hero, maxHp, currentHp: maxHp },
+        message: 'Protective sigils glow. Max HP rises by 10 and wounds close.'
+      };
+    }
+  }
+};
+
+function generateMarketInventory(): MarketItem[] {
+  const entries = Object.values(MARKET_CATALOG);
+  const shuffled = [...entries];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const temp = shuffled[index];
+    shuffled[index] = shuffled[swapIndex];
+    shuffled[swapIndex] = temp;
+  }
+  return shuffled.slice(0, 3).map(({ key, name, description, cost }) => ({
+    key,
+    name,
+    description,
+    cost
+  }));
+}
 
 const GameContext = React.createContext<GameContextValue | undefined>(undefined);
 
@@ -114,7 +188,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         location: stored.location,
         view: 'map',
         battle: null,
-        message: `Welcome back, ${stored.hero.name}.`
+        message: `Welcome back, ${stored.hero.name}.`,
+        marketInventory: generateMarketInventory()
       };
     }
     return { ...defaultState };
@@ -133,7 +208,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         location: 'village',
         view: 'map',
         battle: null,
-        message: `Welcome to HallowMoon, ${name}.`
+        message: `Welcome to HallowMoon, ${name}.`,
+        marketInventory: generateMarketInventory()
       }));
     },
     [updateState]
@@ -153,6 +229,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       view: 'training',
       location: 'village',
       message: 'Focus your efforts on the stat you crave to hone.'
+    }));
+  }, [updateState]);
+
+  const visitMarket = React.useCallback(() => {
+    updateState((current) => ({
+      ...current,
+      view: 'market',
+      location: 'village',
+      marketInventory:
+        current.marketInventory.length > 0
+          ? current.marketInventory
+          : generateMarketInventory(),
+      message: 'The Moonlit Market shimmers to life beneath the lanterns.'
     }));
   }, [updateState]);
 
@@ -252,6 +341,41 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     [updateState]
   );
 
+  const buyFromMarket = React.useCallback(
+    (itemKey: MarketItemKey) => {
+      updateState((current) => {
+        if (!current.hero) {
+          return current;
+        }
+        const definition = MARKET_CATALOG[itemKey];
+        if (!definition) {
+          return current;
+        }
+        if (current.hero.coins < definition.cost) {
+          return {
+            ...current,
+            message: 'You lack the coins for that purchase.'
+          };
+        }
+        const heroAfterPurchase = {
+          ...current.hero,
+          coins: current.hero.coins - definition.cost
+        };
+        const { hero: upgradedHero, message } = definition.apply(heroAfterPurchase);
+        const remainingInventory = current.marketInventory.filter(
+          (item) => item.key !== itemKey
+        );
+        return {
+          ...current,
+          hero: upgradedHero,
+          marketInventory: remainingInventory,
+          message: `${definition.name} acquired. ${message}`
+        };
+      });
+    },
+    [updateState]
+  );
+
   const resolveVictory = React.useCallback(
     (current: GameState, hero: Hero, battle: BattleState) => {
       const heroClone: Hero = { ...hero };
@@ -264,7 +388,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         location: current.location,
         view: 'map',
         battle: null,
-        message: levelMessage ? `${rewardMessage} ${levelMessage}` : rewardMessage
+        message: levelMessage ? `${rewardMessage} ${levelMessage}` : rewardMessage,
+        marketInventory: current.marketInventory
       } satisfies GameState;
     },
     []
@@ -280,7 +405,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       location: 'village',
       view: 'map',
       battle: null,
-      message: 'Defeat stings. You limp back to the village to recover.'
+      message: 'Defeat stings. You limp back to the village to recover.',
+      marketInventory: generateMarketInventory()
     } satisfies GameState;
   }, []);
 
@@ -364,7 +490,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         location: 'village',
         view: 'map',
         battle: null,
-        message: 'You retreat beneath the moon, vowing to return stronger.'
+        message: 'You retreat beneath the moon, vowing to return stronger.',
+        marketInventory: current.marketInventory
       } satisfies GameState;
     });
   }, [updateState]);
@@ -392,6 +519,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       startTraining,
       train: applyTraining,
       rest,
+      visitMarket,
+      buyFromMarket,
       startBattle,
       performHeroMove,
       retreat,
@@ -406,6 +535,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       startTraining,
       applyTraining,
       rest,
+      visitMarket,
+      buyFromMarket,
       startBattle,
       performHeroMove,
       retreat,

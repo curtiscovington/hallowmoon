@@ -2,6 +2,19 @@ export type Species = 'Werewolf' | 'Vampire';
 export type LocationKey = 'village' | 'forest' | 'ruins';
 export type TrainableStat = 'str' | 'agi' | 'wis';
 
+export type MarketItemKey =
+  | 'moon-tonic'
+  | 'silvered-armaments'
+  | 'occult-primer'
+  | 'lunar-wardstone';
+
+export interface MarketItem {
+  key: MarketItemKey;
+  name: string;
+  description: string;
+  cost: number;
+}
+
 export interface Hero {
   name: string;
   species: Species;
@@ -84,7 +97,7 @@ export interface BattleState {
   turn: 'hero' | 'enemy';
 }
 
-export type GameView = 'create' | 'map' | 'battle' | 'training';
+export type GameView = 'create' | 'map' | 'battle' | 'training' | 'market';
 
 export interface GameState {
   hero: Hero | null;
@@ -92,6 +105,7 @@ export interface GameState {
   location: LocationKey;
   battle: BattleState | null;
   message: string | null;
+  marketInventory: MarketItem[];
 }
 
 export interface PersistedState {
