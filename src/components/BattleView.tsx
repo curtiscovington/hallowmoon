@@ -1,6 +1,17 @@
 import React from 'react';
 import { useGame } from '../state/GameContext';
 
+type BattleSheet = 'timeline' | 'log' | null;
+
+type BattleTabEntry = {
+  owner: 'hero' | 'enemy';
+  key: string;
+  name: string;
+  description: string;
+  remainingTurns: number;
+  totalTurns: number;
+};
+
 function formatModifier(label: string, value: number) {
   if (value === 0) {
     return null;
@@ -13,6 +24,13 @@ function formatTurnCount(turns: number) {
   return `${turns} turn${turns === 1 ? '' : 's'}`;
 }
 
+function clampPercent(value: number) {
+  if (Number.isNaN(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
 export function BattleView() {
   const {
     state: { hero, battle },
@@ -21,6 +39,7 @@ export function BattleView() {
     retreat
   } = useGame();
 
+  const [activeSheet, setActiveSheet] = React.useState<BattleSheet>(null);
   const logRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
@@ -32,16 +51,21 @@ export function BattleView() {
     }
   }, [battle?.log]);
 
+  React.useEffect(() => {
+    setActiveSheet(null);
+  }, [battle?.enemy.id]);
+
   if (!hero || !battle) {
     return null;
   }
 
   const moves = heroMoves();
   const heroActing = battle.turn === 'hero';
-  const heroHpPercent = Math.max(0, Math.round((battle.heroHp / hero.maxHp) * 100));
-  const enemyHpPercent = Math.max(
-    0,
-    Math.round((battle.enemyHp / battle.enemy.maxHp) * 100)
+  const heroHpPercent = clampPercent((battle.heroHp / hero.maxHp) * 100);
+  const enemyHpPercent = clampPercent((battle.enemyHp / battle.enemy.maxHp) * 100);
+  const heroVigorPercent = clampPercent((hero.energy / hero.maxEnergy) * 100);
+  const heroEssencePercent = clampPercent(
+    ((hero.wis + battle.heroWisMod) / (hero.wis + 5)) * 100
   );
   const heroModifiers = [
     formatModifier('STR', battle.heroStrMod),
@@ -56,250 +80,355 @@ export function BattleView() {
   const enemyStatuses = battle.enemyStatuses;
   const heroPending = battle.pendingActions.filter((action) => action.owner === 'hero');
   const enemyPending = battle.pendingActions.filter((action) => action.owner === 'enemy');
-  const turnMessage = heroActing
-    ? 'Choose a move to press your advantage.'
-    : `${battle.enemy.name} is preparing a response...`;
+
+  const timelineEntries: BattleTabEntry[] = [...heroPending, ...enemyPending]
+    .map((action) => ({ ...action, owner: action.owner }))
+    .sort((a, b) => a.remainingTurns - b.remainingTurns);
+
+  const momentumSwing = clampPercent(
+    50 + (heroHpPercent - enemyHpPercent) * 0.6 + (heroActing ? 12 : -12)
+  );
+
+  const statusStrip = [
+    ...heroStatuses.map((status) => ({ ...status, owner: 'hero' as const })),
+    ...enemyStatuses.map((status) => ({ ...status, owner: 'enemy' as const }))
+  ];
+
+  const timelinePeek = timelineEntries.slice(0, 2);
+  const logPreview = battle.log.slice(0, 2);
+
+  const heroNextAction = heroPending[0] ?? null;
+  const enemyNextAction = enemyPending[0] ?? null;
+  const reactionSlots = [heroPending[0] ?? null, heroPending[1] ?? null];
 
   return (
-    <section className="card battle-card">
-      <h2 style={{ marginTop: 0 }}>Battle!</h2>
-      <div className="battle-turn">
-        <span className="battle-turn__label" data-active={heroActing}>
-          Your Turn
-        </span>
-        <span className="battle-turn__status">{turnMessage}</span>
-        <span className="battle-turn__label" data-active={!heroActing}>
-          Enemy Turn
-        </span>
-      </div>
-      <div className="battle-entities">
-        <article className="card battle-entity" data-active={heroActing}>
-          <header className="battle-entity__header">
-            <h3>You</h3>
-            <span className="tag">Level {hero.level}</span>
-          </header>
-          <div className="battle-bar">
-            <div className="battle-bar__labels">
-              <span>HP</span>
-              <span>
-                {battle.heroHp}/{hero.maxHp}
-              </span>
-            </div>
-            <div className="battle-bar__track">
+    <section className="battle-shell" aria-label="Battle interface">
+      <header className="battle-top card" aria-label="Combatants summary">
+        <div className="battle-top__row">
+          <article className="combatant-card combatant-card--hero" aria-label={`${hero.name} vitals`}>
+            <header className="combatant-card__header">
+              <span className="combatant-card__name">{hero.name}</span>
+              <span className="combatant-card__tag">Lv {hero.level}</span>
+            </header>
+            <div className="combatant-card__gauges">
               <div
-                className="battle-bar__value"
-                style={{ width: `${heroHpPercent}%` }}
-              />
-            </div>
-          </div>
-          <dl className="battle-entity__stats">
-            <div>
-              <dt>STR</dt>
-              <dd>{hero.str}</dd>
-            </div>
-            <div>
-              <dt>AGI</dt>
-              <dd>{hero.agi}</dd>
-            </div>
-            <div>
-              <dt>WIS</dt>
-              <dd>{hero.wis}</dd>
-            </div>
-          </dl>
-          {heroModifiers.length > 0 && (
-            <div className="battle-modifiers">
-              {heroModifiers.map((modifier) => (
-                <span
-                  key={modifier}
-                  className={`tag ${modifier.includes('-') ? 'tag-negative' : 'tag-positive'}`}
-                >
-                  {modifier}
-                </span>
-              ))}
-            </div>
-          )}
-          {heroStatuses.length > 0 && (
-            <div className="battle-statuses">
-              {heroStatuses.map((status) => (
-                <span
-                  key={status.key}
-                  className={`tag battle-status battle-status--${status.type}`}
-                  title={status.description}
-                >
-                  {status.label}
-                  <span className="battle-status__timer">
-                    {formatTurnCount(status.remainingTurns)}
-                  </span>
-                </span>
-              ))}
-            </div>
-          )}
-        </article>
-        <article className="card battle-entity" data-active={!heroActing}>
-          <header className="battle-entity__header">
-            <h3>{battle.enemy.name}</h3>
-            <span className="tag">{battle.enemy.species}</span>
-          </header>
-          <p className="battle-entity__description">{battle.enemy.description}</p>
-          <div className="battle-bar">
-            <div className="battle-bar__labels">
-              <span>HP</span>
-              <span>
-                {battle.enemyHp}/{battle.enemy.maxHp}
-              </span>
-            </div>
-            <div className="battle-bar__track">
+                className="combatant-card__gauge"
+                role="meter"
+                aria-label="Hero health"
+                aria-valuenow={battle.heroHp}
+                aria-valuemin={0}
+                aria-valuemax={hero.maxHp}
+              >
+                <div className="combatant-card__gauge-header">
+                  <span>HP</span>
+                  <span>{battle.heroHp}/{hero.maxHp}</span>
+                </div>
+                <div className="gauge-track">
+                  <div className="gauge-fill gauge-fill--hero" style={{ width: `${heroHpPercent}%` }} />
+                </div>
+              </div>
               <div
-                className="battle-bar__value battle-bar__value--enemy"
-                style={{ width: `${enemyHpPercent}%` }}
-              />
+                className="combatant-card__gauge"
+                role="meter"
+                aria-label="Hero vigor"
+                aria-valuenow={hero.energy}
+                aria-valuemin={0}
+                aria-valuemax={hero.maxEnergy}
+              >
+                <div className="combatant-card__gauge-header">
+                  <span>Vigor</span>
+                  <span>{hero.energy}/{hero.maxEnergy}</span>
+                </div>
+                <div className="gauge-track">
+                  <div className="gauge-fill gauge-fill--vigor" style={{ width: `${heroVigorPercent}%` }} />
+                </div>
+              </div>
+              <div
+                className="combatant-card__gauge"
+                role="meter"
+                aria-label="Hero essence"
+                aria-valuenow={heroEssencePercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div className="combatant-card__gauge-header">
+                  <span>Essence</span>
+                  <span>{heroEssencePercent}%</span>
+                </div>
+                <div className="gauge-track">
+                  <div className="gauge-fill gauge-fill--essence" style={{ width: `${heroEssencePercent}%` }} />
+                </div>
+              </div>
             </div>
-          </div>
-          <dl className="battle-entity__stats">
-            <div>
-              <dt>STR</dt>
-              <dd>{battle.enemy.str + battle.enemyStrMod}</dd>
-            </div>
-            <div>
-              <dt>AGI</dt>
-              <dd>{battle.enemy.agi + battle.enemyAgiMod}</dd>
-            </div>
-            <div>
-              <dt>WIS</dt>
-              <dd>{battle.enemy.wis}</dd>
-            </div>
-          </dl>
-          {enemyModifiers.length > 0 && (
-            <div className="battle-modifiers">
-              {enemyModifiers.map((modifier) => (
-                <span
-                  key={modifier}
-                  className={`tag ${modifier.includes('-') ? 'tag-negative' : 'tag-positive'}`}
-                >
-                  {modifier}
-                </span>
-              ))}
-            </div>
-          )}
-          {enemyStatuses.length > 0 && (
-            <div className="battle-statuses">
-              {enemyStatuses.map((status) => (
-                <span
-                  key={status.key}
-                  className={`tag battle-status battle-status--${status.type}`}
-                  title={status.description}
-                >
-                  {status.label}
-                  <span className="battle-status__timer">
-                    {formatTurnCount(status.remainingTurns)}
+            {heroModifiers.length > 0 && (
+              <div className="combatant-card__modifiers" aria-label="Hero modifiers">
+                {heroModifiers.map((modifier) => (
+                  <span
+                    key={modifier}
+                    className={`modifier-chip ${modifier.includes('-') ? 'modifier-chip--negative' : 'modifier-chip--positive'}`}
+                  >
+                    {modifier}
                   </span>
-                </span>
-              ))}
-            </div>
-          )}
-        </article>
-      </div>
-      <div className="battle-timeline">
-        <section className="battle-timeline__section" aria-label="Your preparations">
-          <header>
-            <h3>You</h3>
-          </header>
-          {heroPending.length > 0 ? (
-            <ul className="pending-action-list">
-              {heroPending.map((action) => {
-                const progress = Math.max(
-                  0,
-                  Math.min(100, ((action.totalTurns - action.remainingTurns) / action.totalTurns) * 100)
-                );
-                return (
-                  <li key={`hero-${action.key}`} className="pending-action">
-                    <div className="pending-action__header">
-                      <span>{action.name}</span>
-                      <span>{formatTurnCount(action.remainingTurns)} left</span>
-                    </div>
-                    <div className="pending-action__progress" aria-hidden="true">
-                      <div className="pending-action__progress-fill" style={{ width: `${progress}%` }} />
-                    </div>
-                    <p>{action.description}</p>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="pending-action__empty">No preparations underway.</p>
-          )}
-        </section>
-        <section className="battle-timeline__section" aria-label={`${battle.enemy.name}'s preparations`}>
-          <header>
-            <h3>{battle.enemy.name}</h3>
-          </header>
-          {enemyPending.length > 0 ? (
-            <ul className="pending-action-list">
-              {enemyPending.map((action) => {
-                const progress = Math.max(
-                  0,
-                  Math.min(100, ((action.totalTurns - action.remainingTurns) / action.totalTurns) * 100)
-                );
-                return (
-                  <li key={`enemy-${action.key}`} className="pending-action">
-                    <div className="pending-action__header">
-                      <span>{action.name}</span>
-                      <span>{formatTurnCount(action.remainingTurns)} left</span>
-                    </div>
-                    <div className="pending-action__progress" aria-hidden="true">
-                      <div className="pending-action__progress-fill" style={{ width: `${progress}%` }} />
-                    </div>
-                    <p>{action.description}</p>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="pending-action__empty">No wind-ups detected.</p>
-          )}
-        </section>
-      </div>
-      <div className="battle-actions">
-        {moves.map((move) => (
-          <button
-            key={move.key}
-            type="button"
-            className="battle-move"
-            onClick={() => performHeroMove(move.key)}
-            disabled={!heroActing}
-            title={move.description}
-          >
-            <span className="battle-move__name">{move.name}</span>
-            <span className="battle-move__type">
-              {move.type}
-              {typeof move.chargeTurns === 'number'
-                ? ` • Charges ${formatTurnCount(move.chargeTurns)}`
-                : ''}
-            </span>
-            <span className="battle-move__hint">{move.description}</span>
-          </button>
-        ))}
-        <button
-          type="button"
-          className="small-button battle-retreat"
-          onClick={retreat}
-        >
-          Retreat
-        </button>
-      </div>
-      <div className="log battle-log" ref={logRef} aria-live="polite">
-        <strong>Battle Log</strong>
-        <ul>
-          {battle.log.map((entry, index) => (
-            <li
-              key={`${entry}-${index}`}
-              className={index === 0 ? 'battle-log__entry battle-log__entry--latest' : 'battle-log__entry'}
+                ))}
+              </div>
+            )}
+          </article>
+
+          <div className="battle-top__center" aria-label="Momentum">
+            <span className="battle-top__label">Momentum</span>
+            <div
+              className="momentum-track"
+              role="meter"
+              aria-valuenow={momentumSwing}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Momentum toward the hero"
             >
-              {entry}
-            </li>
+              <div className="momentum-track__fill" style={{ width: `${momentumSwing}%` }} />
+            </div>
+            <span className="battle-top__phase">
+              {heroActing ? 'Plan your next technique' : `${battle.enemy.name} is acting`}
+            </span>
+          </div>
+
+          <article className="combatant-card combatant-card--enemy" aria-label={`${battle.enemy.name} vitals`}>
+            <header className="combatant-card__header">
+              <span className="combatant-card__name">{battle.enemy.name}</span>
+              <span className="combatant-card__tag">{battle.enemy.species}</span>
+            </header>
+            <div className="combatant-card__gauges">
+              <div
+                className="combatant-card__gauge"
+                role="meter"
+                aria-label="Enemy health"
+                aria-valuenow={battle.enemyHp}
+                aria-valuemin={0}
+                aria-valuemax={battle.enemy.maxHp}
+              >
+                <div className="combatant-card__gauge-header">
+                  <span>HP</span>
+                  <span>{battle.enemyHp}/{battle.enemy.maxHp}</span>
+                </div>
+                <div className="gauge-track">
+                  <div className="gauge-fill gauge-fill--enemy" style={{ width: `${enemyHpPercent}%` }} />
+                </div>
+              </div>
+              <div className="combatant-card__gauge">
+                <div className="combatant-card__gauge-header">
+                  <span>Intent</span>
+                  <span>{enemyNextAction ? formatTurnCount(enemyNextAction.remainingTurns) : 'Now'}</span>
+                </div>
+                <div className="intent-badge">{enemyNextAction?.name ?? 'Unknown'}</div>
+              </div>
+            </div>
+            {enemyModifiers.length > 0 && (
+              <div className="combatant-card__modifiers" aria-label="Enemy modifiers">
+                {enemyModifiers.map((modifier) => (
+                  <span
+                    key={modifier}
+                    className={`modifier-chip ${modifier.includes('-') ? 'modifier-chip--negative' : 'modifier-chip--positive'}`}
+                  >
+                    {modifier}
+                  </span>
+                ))}
+              </div>
+            )}
+          </article>
+        </div>
+      </header>
+
+      <section className="battle-quick card" aria-label="Battle overview">
+        <div className="battle-status-strip" aria-label="Active effects">
+          {statusStrip.length > 0 ? (
+            statusStrip.map((status) => (
+              <span
+                key={`${status.owner}-${status.key}`}
+                className={`status-chip status-chip--${status.owner} status-chip--${status.type}`}
+                title={status.description}
+              >
+                <span className="status-chip__label">{status.label}</span>
+                <span className="status-chip__timer">{formatTurnCount(status.remainingTurns)}</span>
+              </span>
+            ))
+          ) : (
+            <span className="status-chip status-chip--empty">No effects in play</span>
+          )}
+        </div>
+
+        <div className="battle-quick__row">
+          <div className="battle-next" aria-label="Your upcoming action">
+            <span className="battle-next__label">Your queue</span>
+            <strong>{heroNextAction ? heroNextAction.name : heroActing ? 'Awaiting command' : 'Resolved'}</strong>
+            <span className="battle-next__detail">
+              {heroNextAction
+                ? `Resolves in ${formatTurnCount(heroNextAction.remainingTurns)}`
+                : heroActing
+                ? 'Select an action below'
+                : 'All moves resolved'}
+            </span>
+          </div>
+          <div className="battle-next" aria-label="Foe upcoming action">
+            <span className="battle-next__label">Foe queue</span>
+            <strong>{enemyNextAction ? enemyNextAction.name : 'No action queued'}</strong>
+            <span className="battle-next__detail">
+              {enemyNextAction
+                ? `Strikes in ${formatTurnCount(enemyNextAction.remainingTurns)}`
+                : 'React to maintain advantage'}
+            </span>
+          </div>
+        </div>
+
+        <div className="battle-peek">
+          <div className="battle-peek__column">
+            <span className="battle-peek__label">Timeline peek</span>
+            <ul>
+              {timelinePeek.length > 0 ? (
+                timelinePeek.map((entry) => (
+                  <li key={`${entry.owner}-${entry.key}`}>
+                    <strong>{entry.owner === 'hero' ? 'You' : battle.enemy.name}</strong>
+                    <span>{entry.name}</span>
+                    <span>{formatTurnCount(entry.remainingTurns)}</span>
+                  </li>
+                ))
+              ) : (
+                <li>No actions queued</li>
+              )}
+            </ul>
+          </div>
+          <div className="battle-peek__column">
+            <span className="battle-peek__label">Recent log</span>
+            <ul>
+              {logPreview.length > 0 ? (
+                logPreview.map((entry, index) => <li key={`${entry}-${index}`}>{entry}</li>)
+              ) : (
+                <li>No events recorded</li>
+              )}
+            </ul>
+          </div>
+        </div>
+
+        <div className="battle-quick__controls">
+          <button type="button" className="chip-button" onClick={() => setActiveSheet('timeline')}>
+            View timeline
+          </button>
+          <button type="button" className="chip-button" onClick={() => setActiveSheet('log')}>
+            View log
+          </button>
+        </div>
+      </section>
+
+      <section className="battle-actions card" aria-label="Actions and reactions">
+        <div className="battle-reactions" aria-label="Reaction slots">
+          <span className="battle-reactions__title">Reactions</span>
+          <div className="battle-reactions__slots">
+            {reactionSlots.map((reaction, index) => (
+              <div key={index} className="reaction-slot" data-filled={Boolean(reaction)}>
+                <span className="reaction-slot__label">{`Slot ${index + 1}`}</span>
+                {reaction ? (
+                  <>
+                    <strong>{reaction.name}</strong>
+                    <span>{reaction.description}</span>
+                  </>
+                ) : (
+                  <span>Assign before battle</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="battle-action-grid" role="group" aria-label="Hero techniques">
+          {moves.map((move) => (
+            <button
+              key={move.key}
+              type="button"
+              className="battle-action-button"
+              onClick={() => performHeroMove(move.key)}
+              disabled={!heroActing}
+              title={move.description}
+            >
+              <span className="battle-action-button__name">{move.name}</span>
+              <span className="battle-action-button__meta">
+                {move.type}
+                {typeof move.chargeTurns === 'number'
+                  ? ` · ${formatTurnCount(move.chargeTurns)} charge`
+                  : ''}
+              </span>
+              <span className="battle-action-button__hint">{move.description}</span>
+            </button>
           ))}
-        </ul>
-      </div>
+          {moves.length < 6 &&
+            Array.from({ length: 6 - moves.length }).map((_, index) => (
+              <div key={`placeholder-${index}`} className="battle-action-button battle-action-button--empty">
+                Locked slot
+              </div>
+            ))}
+        </div>
+
+        <div className="battle-actions__footer">
+          <button type="button" className="small-button battle-retreat" onClick={retreat}>
+            Retreat
+          </button>
+        </div>
+      </section>
+
+      {activeSheet && (
+        <div
+          className="battle-sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-label={activeSheet === 'timeline' ? 'Full turn timeline' : 'Battle log'}
+        >
+          <div className="battle-sheet__content">
+            <header className="battle-sheet__header">
+              <h2>{activeSheet === 'timeline' ? 'Turn Timeline' : 'Battle Log'}</h2>
+              <button type="button" className="small-button" onClick={() => setActiveSheet(null)}>
+                Close
+              </button>
+            </header>
+            {activeSheet === 'timeline' ? (
+              <div className="battle-sheet__body">
+                <ol>
+                  {timelineEntries.length > 0 ? (
+                    timelineEntries.map((entry) => {
+                      const progress = clampPercent(
+                        ((entry.totalTurns - entry.remainingTurns) / entry.totalTurns) * 100
+                      );
+                      return (
+                        <li key={`${entry.owner}-${entry.key}`}>
+                          <div className={`timeline-entry timeline-entry--${entry.owner}`}>
+                            <header>
+                              <span>{entry.owner === 'hero' ? 'You' : battle.enemy.name}</span>
+                              <span>{formatTurnCount(entry.remainingTurns)}</span>
+                            </header>
+                            <strong>{entry.name}</strong>
+                            <p>{entry.description}</p>
+                            <div className="timeline-entry__progress" aria-hidden="true">
+                              <div style={{ width: `${progress}%` }} />
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })
+                  ) : (
+                    <li>No actions queued.</li>
+                  )}
+                </ol>
+              </div>
+            ) : (
+              <div className="battle-sheet__body" ref={logRef}>
+                <ol>
+                  {battle.log.length > 0 ? (
+                    battle.log.map((entry, index) => <li key={`${entry}-${index}`}>{entry}</li>)
+                  ) : (
+                    <li>No events recorded yet.</li>
+                  )}
+                </ol>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
