@@ -6,6 +6,7 @@ type NavTarget = Extract<GameView, 'hero' | 'map' | 'training' | 'market'>;
 type NavItem = {
   key: NavTarget;
   label: string;
+  icon: string;
   action: () => void;
 };
 
@@ -23,10 +24,10 @@ export function StageNavigation() {
   }
 
   const items: NavItem[] = [
-    { key: 'map', label: 'Map', action: goToMap },
-    { key: 'hero', label: 'Hero', action: viewHero },
-    { key: 'training', label: 'Training', action: startTraining },
-    { key: 'market', label: 'Market', action: visitMarket }
+    { key: 'map', label: 'Map', icon: '🗺️', action: goToMap },
+    { key: 'hero', label: 'Hero', icon: '⚔️', action: viewHero },
+    { key: 'training', label: 'Training', icon: '🏋️', action: startTraining },
+    { key: 'market', label: 'Market', icon: '🛒', action: visitMarket }
   ];
 
   const handleClick = (item: NavItem) => {
@@ -48,7 +49,10 @@ export function StageNavigation() {
           }`}
           aria-current={view === item.key ? 'page' : undefined}
         >
-          {item.label}
+          <span aria-hidden="true" className="stage-nav__icon">
+            {item.icon}
+          </span>
+          <span className="stage-nav__label">{item.label}</span>
         </button>
       ))}
     </nav>
