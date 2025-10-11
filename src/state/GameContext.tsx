@@ -22,6 +22,7 @@ import {
 interface GameContextValue {
   state: GameState;
   createHero: (name: string, species: Species) => void;
+  viewHero: () => void;
   goToMap: () => void;
   startTraining: () => void;
   train: (stat: TrainableStat) => void;
@@ -223,12 +224,29 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }));
   }, [updateState]);
 
+  const viewHero = React.useCallback(() => {
+    updateState((current) => {
+      if (!current.hero) {
+        return current;
+      }
+      return {
+        ...current,
+        view: 'hero',
+        battle: null
+      };
+    });
+  }, [updateState]);
+
   const startTraining = React.useCallback(() => {
     updateState((current) => ({
       ...current,
       view: 'training',
       location: 'village',
-      message: 'Focus your efforts on the stat you crave to hone.'
+      battle: null,
+      message:
+        current.view === 'training'
+          ? current.message
+          : 'Focus your efforts on the stat you crave to hone.'
     }));
   }, [updateState]);
 
@@ -237,11 +255,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       ...current,
       view: 'market',
       location: 'village',
+      battle: null,
       marketInventory:
         current.marketInventory.length > 0
           ? current.marketInventory
           : generateMarketInventory(),
-      message: 'The Moonlit Market shimmers to life beneath the lanterns.'
+      message:
+        current.view === 'market'
+          ? current.message
+          : 'The Moonlit Market shimmers to life beneath the lanterns.'
     }));
   }, [updateState]);
 
@@ -515,6 +537,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     () => ({
       state,
       createHero,
+      viewHero,
       goToMap,
       startTraining,
       train: applyTraining,
@@ -531,6 +554,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     [
       state,
       createHero,
+      viewHero,
       goToMap,
       startTraining,
       applyTraining,

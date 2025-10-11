@@ -97,7 +97,7 @@ export interface BattleState {
   turn: 'hero' | 'enemy';
 }
 
-export type GameView = 'create' | 'map' | 'battle' | 'training' | 'market';
+export type GameView = 'create' | 'hero' | 'map' | 'battle' | 'training' | 'market';
 
 export interface GameState {
   hero: Hero | null;

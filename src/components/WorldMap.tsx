@@ -29,25 +29,35 @@ export function WorldMap() {
   ];
 
   return (
-    <section className="grid" style={{ gap: '1.5rem' }}>
-      {nodes.map((node) => (
-        <article key={node.key} className="card" style={{ position: 'relative' }}>
-          <h3 style={{ marginTop: 0 }}>{node.title}</h3>
-          <p style={{ opacity: 0.85 }}>{node.description}</p>
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            {node.actions.map((action) => (
-              <button
-                key={action.label}
-                type="button"
-                onClick={action.onClick}
-                className="small-button"
-              >
-                {action.label}
-              </button>
-            ))}
-          </div>
-        </article>
-      ))}
+    <section className="card world-card" aria-label="World destinations">
+      <header className="world-card__header">
+        <h2 className="card__title">Choose Your Next Hunt</h2>
+        <p className="card__description">
+          Each locale shifts the threats you face. Pick a route that suits your current momentum.
+        </p>
+      </header>
+      <ul className="world-card__list">
+        {nodes.map((node) => (
+          <li key={node.key} className="world-card__node">
+            <div>
+              <h3 className="world-card__node-title">{node.title}</h3>
+              <p className="world-card__node-detail">{node.description}</p>
+            </div>
+            <div className="world-card__actions">
+              {node.actions.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={action.onClick}
+                  className="small-button"
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

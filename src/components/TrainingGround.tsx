@@ -35,28 +35,37 @@ export function TrainingGround() {
   }
 
   return (
-    <section className="card">
-      <h2 style={{ marginTop: 0 }}>Training Grounds</h2>
-      <p style={{ opacity: 0.85 }}>
-        Each session consumes 1 energy. Rest in the village to recover if you tire.
-      </p>
-      <div className="grid">
+    <section className="card training-card" aria-label="Training grounds">
+      <header className="training-card__header">
+        <h2 className="card__title">Training Grounds</h2>
+        <p className="card__description">
+          Each session consumes 1 energy. Rest in the village to recover if you tire.
+        </p>
+      </header>
+      <ul className="training-card__options">
         {trainingOptions.map((option) => (
-          <article key={option.key} className="card" style={{ background: 'rgba(26, 12, 48, 0.75)' }}>
-            <h3 style={{ marginTop: 0 }}>{option.title}</h3>
-            <p style={{ opacity: 0.8 }}>{option.detail}</p>
-            <button type="button" onClick={() => train(option.key)} disabled={hero.energy <= 0}>
+          <li key={option.key} className="training-card__option">
+            <div>
+              <h3 className="training-card__option-title">{option.title}</h3>
+              <p className="training-card__option-detail">{option.detail}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => train(option.key)}
+              disabled={hero.energy <= 0}
+              className="small-button"
+            >
               Train {option.title.split(' ')[0]}
             </button>
-          </article>
+          </li>
         ))}
-      </div>
-      <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+      </ul>
+      <footer className="training-card__footer">
         <span className="tag">Energy {hero.energy}/{hero.maxEnergy}</span>
         <button className="small-button" type="button" onClick={goToMap}>
           Back to Map
         </button>
-      </div>
+      </footer>
     </section>
   );
 }
