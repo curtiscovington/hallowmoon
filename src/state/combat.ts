@@ -81,6 +81,7 @@ export function createEnemy(location: LocationKey, heroLevel: number): Enemy {
     id: blueprint.id,
     name: blueprint.name,
     species: blueprint.species,
+    location: blueprint.location,
     maxHp: scaleValue(base.maxHp, heroLevel),
     str: scaleValue(base.str, heroLevel),
     agi: scaleValue(base.agi, heroLevel),

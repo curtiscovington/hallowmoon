@@ -10,11 +10,13 @@ import {
 import {
   BattleMove,
   BattleState,
+  BattleRewardItem,
   GameState,
   Hero,
   LocationKey,
   MarketItem,
   MarketItemKey,
+  PostBattleRewards,
   Species,
   TrainableStat
 } from './types';
@@ -36,6 +38,7 @@ interface GameContextValue {
   resetGame: () => void;
   heroMoves: () => BattleMove[];
   dismissMessage: () => void;
+  acknowledgeRewards: () => void;
 }
 
 const defaultState: GameState = {
@@ -44,7 +47,8 @@ const defaultState: GameState = {
   location: 'village',
   battle: null,
   message: null,
-  marketInventory: []
+  marketInventory: [],
+  postBattleRewards: null
 };
 
 type MarketEffectResult = { hero: Hero; message: string };
@@ -92,6 +96,102 @@ const MARKET_CATALOG: Record<MarketItemKey, MarketItem & { apply: MarketEffect }
   return catalog;
 })();
 
+type LootDefinition = BattleRewardItem & {
+  dropRate: number;
+};
+
+const LOCATION_LOOT_TABLE: Record<LocationKey, LootDefinition[]> = {
+  village: [
+    {
+      id: 'guild-token',
+      name: 'Guild Favor Token',
+      description: 'Proof of triumph in sanctioned duels. Traders respect its seal.',
+      rarity: 'common',
+      dropRate: 0.75
+    },
+    {
+      id: 'polished-charm',
+      name: 'Polished Moon Charm',
+      description: 'A small charm infused with moonlight. Slightly boosts morale.',
+      rarity: 'rare',
+      dropRate: 0.35
+    }
+  ],
+  forest: [
+    {
+      id: 'silversap-resin',
+      name: 'Silversap Resin',
+      description: 'Sticky sap harvested from whispering pines. Merchants prize it.',
+      rarity: 'common',
+      dropRate: 0.8
+    },
+    {
+      id: 'lupine-fang',
+      name: 'Lupine Fang',
+      description: 'A gleaming fang humming with feral energy.',
+      rarity: 'rare',
+      dropRate: 0.45
+    },
+    {
+      id: 'moonlit-cloak-fragment',
+      name: 'Moonlit Cloak Fragment',
+      description: 'Shimmering cloth from a hunter’s mantle. Said to deflect claws.',
+      rarity: 'epic',
+      dropRate: 0.2
+    }
+  ],
+  ruins: [
+    {
+      id: 'wraith-essence',
+      name: 'Wraith Essence',
+      description: 'Distilled moonfire in liquid form. Glows faintly in the dark.',
+      rarity: 'rare',
+      dropRate: 0.65
+    },
+    {
+      id: 'arcane-sigil-shard',
+      name: 'Arcane Sigil Shard',
+      description: 'Broken fragment of an ancient wardstone etched with runes.',
+      rarity: 'common',
+      dropRate: 0.85
+    },
+    {
+      id: 'lunar-relay-crystal',
+      name: 'Lunar Relay Crystal',
+      description: 'A resonant crystal that hums with forgotten incantations.',
+      rarity: 'epic',
+      dropRate: 0.25
+    }
+  ]
+};
+
+function rollBattleLoot(enemyLocation: LocationKey): BattleRewardItem[] {
+  const lootTable = LOCATION_LOOT_TABLE[enemyLocation] ?? [];
+  const drops: BattleRewardItem[] = [];
+  lootTable.forEach((entry) => {
+    if (Math.random() < entry.dropRate) {
+      drops.push({
+        id: entry.id,
+        name: entry.name,
+        description: entry.description,
+        rarity: entry.rarity
+      });
+    }
+  });
+  if (drops.length === 0 && lootTable.length > 0) {
+    const fallback = lootTable.reduce((best, current) =>
+      current.dropRate > best.dropRate ? current : best
+    );
+    drops.push({
+      id: fallback.id,
+      name: fallback.name,
+      description: fallback.description,
+      rarity: fallback.rarity
+    });
+  }
+  return drops;
+}
+
 function generateMarketInventory(): MarketItem[] {
   const entries = Object.values(MARKET_CATALOG);
   const shuffled = [...entries];
@@ -116,6 +216,7 @@ const GameContext = React.createContext<GameContextValue | undefined>(undefined)
 type LevelResult = {
   hero: Hero;
   levelMessage: string | null;
+  levelMessages: string[];
 };
 
 function xpToNext(level: number): number {
@@ -158,7 +259,11 @@ function applyLevelUps(hero: Hero): LevelResult {
     updated.currentHp = updated.maxHp;
     messages.push(`Level ${updated.level}! Moonlight surges through you.`);
   }
-  return { hero: updated, levelMessage: messages.length ? messages.join(' ') : null };
+  return {
+    hero: updated,
+    levelMessage: messages.length ? messages.join(' ') : null,
+    levelMessages: messages
+  };
 }
 
 function withPersistence(
@@ -186,7 +291,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         view: 'map',
         battle: null,
         message: `Welcome back, ${stored.hero.name}.`,
-        marketInventory: generateMarketInventory()
+        marketInventory: generateMarketInventory(),
+        postBattleRewards: null
       };
     }
     return { ...defaultState };
@@ -206,7 +312,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         view: 'map',
         battle: null,
         message: `Welcome to HallowMoon, ${name}.`,
-        marketInventory: generateMarketInventory()
+        marketInventory: generateMarketInventory(),
+        postBattleRewards: null
       }));
     },
     [updateState]
@@ -216,7 +323,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     updateState((current) => ({
       ...current,
       view: 'map',
-      battle: null
+      battle: null,
+      postBattleRewards: null
     }));
   }, [updateState]);
 
@@ -228,7 +336,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       return {
         ...current,
         view: 'hero',
-        battle: null
+        battle: null,
+        postBattleRewards: null
       };
     });
   }, [updateState]);
@@ -239,6 +348,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       view: 'training',
       location: 'village',
       battle: null,
+      postBattleRewards: null,
       message:
         current.view === 'training'
           ? current.message
@@ -252,6 +362,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       view: 'market',
       location: 'village',
       battle: null,
+      postBattleRewards: null,
       marketInventory:
         current.marketInventory.length > 0
           ? current.marketInventory
@@ -314,7 +425,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         ...current,
         location: 'village',
         hero,
-        message: 'A calm night passes. Your strength is restored.'
+        message: 'A calm night passes. Your strength is restored.',
+        postBattleRewards: null
       };
     });
   }, [updateState]);
@@ -352,7 +464,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           location,
           view: 'battle',
           battle,
-          message: null
+          message: null,
+          postBattleRewards: null
         };
       });
     },
@@ -396,18 +509,42 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const resolveVictory = React.useCallback(
     (current: GameState, hero: Hero, battle: BattleState) => {
+      const heroBefore: Hero = { ...hero };
+      const xpEarned = battle.enemy.xp;
+      const coinsEarned = battle.enemy.coins;
       const heroClone: Hero = { ...hero };
-      heroClone.xp += battle.enemy.xp;
-      heroClone.coins += battle.enemy.coins;
-      const { hero: leveledHero, levelMessage } = applyLevelUps(heroClone);
-      const rewardMessage = `Victory over ${battle.enemy.name}! +${battle.enemy.xp} XP, +${battle.enemy.coins} coins.`;
+      heroClone.xp += xpEarned;
+      heroClone.coins += coinsEarned;
+      const { hero: leveledHero, levelMessages } = applyLevelUps(heroClone);
+      const loot = rollBattleLoot(battle.enemy.location);
+      const rewardSummary: PostBattleRewards = {
+        enemyName: battle.enemy.name,
+        enemyArtwork: battle.enemy.artwork,
+        xpEarned,
+        coinsEarned,
+        items: loot,
+        heroProgress: {
+          before: {
+            level: heroBefore.level,
+            xp: heroBefore.xp,
+            coins: heroBefore.coins
+          },
+          after: {
+            level: leveledHero.level,
+            xp: leveledHero.xp,
+            coins: leveledHero.coins
+          },
+          levelUps: levelMessages
+        }
+      };
       return {
         hero: leveledHero,
         location: current.location,
-        view: 'map',
+        view: 'post-battle',
         battle: null,
-        message: levelMessage ? `${rewardMessage} ${levelMessage}` : rewardMessage,
-        marketInventory: current.marketInventory
+        message: null,
+        marketInventory: current.marketInventory,
+        postBattleRewards: rewardSummary
       } satisfies GameState;
     },
     []
@@ -424,7 +561,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       view: 'map',
       battle: null,
       message: 'Defeat stings. You limp back to the village to recover.',
-      marketInventory: generateMarketInventory()
+      marketInventory: generateMarketInventory(),
+      postBattleRewards: null
     } satisfies GameState;
   }, []);
 
@@ -509,7 +647,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         view: 'map',
         battle: null,
         message: 'You retreat beneath the moon, vowing to return stronger.',
-        marketInventory: current.marketInventory
+        marketInventory: current.marketInventory,
+        postBattleRewards: null
       } satisfies GameState;
     });
   }, [updateState]);
@@ -529,6 +668,24 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     updateState((current) => ({ ...current, message: null }));
   }, [updateState]);
 
+  const acknowledgeRewards = React.useCallback(() => {
+    updateState((current) => {
+      if (!current.postBattleRewards) {
+        return { ...current, view: 'map', battle: null };
+      }
+      const summary = current.postBattleRewards;
+      const baseMessage = `Victory over ${summary.enemyName}! +${summary.xpEarned} XP, +${summary.coinsEarned} coins.`;
+      const levelMessage = summary.heroProgress.levelUps.join(' ');
+      return {
+        ...current,
+        view: 'map',
+        battle: null,
+        postBattleRewards: null,
+        message: levelMessage ? `${baseMessage} ${levelMessage}` : baseMessage
+      };
+    });
+  }, [updateState]);
+
   const value = React.useMemo(
     () => ({
       state,
@@ -545,7 +702,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       retreat,
       resetGame,
       heroMoves,
-      dismissMessage
+      dismissMessage,
+      acknowledgeRewards
     }),
     [
       state,
@@ -562,7 +720,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       retreat,
       resetGame,
       heroMoves,
-      dismissMessage
+      dismissMessage,
+      acknowledgeRewards
     ]
   );
 

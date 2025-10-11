@@ -3,6 +3,7 @@ import { BattleView } from './components/BattleView';
 import { CharacterCreation } from './components/CharacterCreation';
 import { MessageBanner } from './components/MessageBanner';
 import { MoonlitMarket } from './components/MoonlitMarket';
+import { PostBattleSummary } from './components/PostBattleSummary';
 import { StageNavigation } from './components/StageNavigation';
 import { StatsPanel } from './components/StatsPanel';
 import { TrainingGround } from './components/TrainingGround';
@@ -26,12 +27,16 @@ function GameScreen() {
     content = <MoonlitMarket />;
   } else if (state.view === 'battle') {
     content = <BattleView />;
+  } else if (state.view === 'post-battle') {
+    content = <PostBattleSummary />;
   }
 
   return (
     <div className="game-stage">
       <MessageBanner />
-      {state.hero && state.view !== 'battle' ? <StageNavigation /> : null}
+      {state.hero && !['battle', 'post-battle'].includes(state.view) ? (
+        <StageNavigation />
+      ) : null}
       {content}
     </div>
   );
