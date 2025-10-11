@@ -88,6 +88,9 @@ export function BattleView() {
   const momentumSwing = clampPercent(
     50 + (heroHpPercent - enemyHpPercent) * 0.6 + (heroActing ? 12 : -12)
   );
+  const momentumState =
+    momentumSwing >= 66 ? 'Advantage' : momentumSwing <= 34 ? 'Peril' : 'Poise';
+  const tempoState = heroActing ? 'Your initiative' : `${battle.enemy.name} pressing`;
 
   const statusStrip = [
     ...heroStatuses.map((status) => ({ ...status, owner: 'hero' as const })),
@@ -100,10 +103,12 @@ export function BattleView() {
   const heroNextAction = heroPending[0] ?? null;
   const enemyNextAction = enemyPending[0] ?? null;
   const reactionSlots = [heroPending[0] ?? null, heroPending[1] ?? null];
+  const heroInitial = hero.name.slice(0, 1).toUpperCase() || '?';
+  const enemyInitial = battle.enemy.name.slice(0, 1).toUpperCase() || '?';
 
   return (
     <section className="screen-shell battle-shell" aria-label="Battle interface">
-      <header className="battle-top card" aria-label="Combatants summary">
+      <header className="battle-top card battle-layout__top" aria-label="Combatants summary">
         <div className="battle-top__row">
           <article className="combatant-card combatant-card--hero" aria-label={`${hero.name} vitals`}>
             <header className="combatant-card__header">
@@ -186,6 +191,9 @@ export function BattleView() {
             >
               <div className="momentum-track__fill" style={{ width: `${momentumSwing}%` }} />
             </div>
+            <span className="battle-top__momentum" data-state={momentumState.toLowerCase()}>
+              {momentumState}
+            </span>
             <span className="battle-top__phase">
               {heroActing ? 'Plan your next technique' : `${battle.enemy.name} is acting`}
             </span>
@@ -237,7 +245,17 @@ export function BattleView() {
         </div>
       </header>
 
-      <section className="battle-quick card" aria-label="Battle overview">
+      <section className="battle-quick card battle-layout__quick" aria-label="Battle overview">
+        <div className="battle-quick__headline" aria-label="Combat tempo overview">
+          <div className="battle-quick__matchup">
+            <strong>{hero.name}</strong>
+            <span>vs</span>
+            <strong>{battle.enemy.name}</strong>
+          </div>
+          <span className="battle-quick__tempo" data-turn={heroActing ? 'hero' : 'enemy'}>
+            {tempoState}
+          </span>
+        </div>
         <div className="battle-status-strip" aria-label="Active effects">
           {statusStrip.length > 0 ? (
             statusStrip.map((status) => (
@@ -255,26 +273,45 @@ export function BattleView() {
           )}
         </div>
 
-        <div className="battle-quick__row">
-          <div className="battle-next" aria-label="Your upcoming action">
-            <span className="battle-next__label">Your queue</span>
-            <strong>{heroNextAction ? heroNextAction.name : heroActing ? 'Awaiting command' : 'Resolved'}</strong>
-            <span className="battle-next__detail">
-              {heroNextAction
-                ? `Resolves in ${formatTurnCount(heroNextAction.remainingTurns)}`
-                : heroActing
-                ? 'Select an action below'
-                : 'All moves resolved'}
+        <div className="battle-glance" aria-label="Combatants at a glance">
+          <div className="battle-glance__side battle-glance__side--hero">
+            <span className="battle-glance__avatar" aria-hidden="true">
+              {heroInitial}
             </span>
+            <div className="battle-glance__meta">
+              <span className="battle-glance__label">Next technique</span>
+              <strong>
+                {heroNextAction
+                  ? heroNextAction.name
+                  : heroActing
+                  ? 'Awaiting command'
+                  : 'Ready'}
+              </strong>
+              <span className="battle-glance__detail">
+                {heroNextAction
+                  ? `Resolves in ${formatTurnCount(heroNextAction.remainingTurns)}`
+                  : heroActing
+                  ? 'Select an action below'
+                  : 'All moves resolved'}
+              </span>
+            </div>
           </div>
-          <div className="battle-next" aria-label="Foe upcoming action">
-            <span className="battle-next__label">Foe queue</span>
-            <strong>{enemyNextAction ? enemyNextAction.name : 'No action queued'}</strong>
-            <span className="battle-next__detail">
-              {enemyNextAction
-                ? `Strikes in ${formatTurnCount(enemyNextAction.remainingTurns)}`
-                : 'React to maintain advantage'}
+          <div className="battle-glance__burst" aria-hidden="true">
+            <span>vs</span>
+          </div>
+          <div className="battle-glance__side battle-glance__side--enemy">
+            <span className="battle-glance__avatar" aria-hidden="true">
+              {enemyInitial}
             </span>
+            <div className="battle-glance__meta">
+              <span className="battle-glance__label">Foe intent</span>
+              <strong>{enemyNextAction ? enemyNextAction.name : 'Unclear'}</strong>
+              <span className="battle-glance__detail">
+                {enemyNextAction
+                  ? `Strikes in ${formatTurnCount(enemyNextAction.remainingTurns)}`
+                  : 'React to maintain advantage'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -317,7 +354,7 @@ export function BattleView() {
         </div>
       </section>
 
-      <section className="battle-actions card" aria-label="Actions and reactions">
+      <section className="battle-actions card battle-layout__actions" aria-label="Actions and reactions">
         <div className="battle-reactions" aria-label="Reaction slots">
           <span className="battle-reactions__title">Reactions</span>
           <div className="battle-reactions__slots">
