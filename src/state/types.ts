@@ -23,6 +23,15 @@ export interface MarketItem {
   flavor?: string;
 }
 
+export type LootRarity = 'common' | 'rare' | 'epic';
+
+export interface BattleRewardItem {
+  id: string;
+  name: string;
+  description: string;
+  rarity: LootRarity;
+}
+
 export interface Hero {
   name: string;
   species: Species;
@@ -79,6 +88,7 @@ export interface Enemy {
   id: string;
   name: string;
   species: Species;
+  location: LocationKey;
   maxHp: number;
   str: number;
   agi: number;
@@ -106,7 +116,37 @@ export interface BattleState {
   turn: 'hero' | 'enemy';
 }
 
-export type GameView = 'create' | 'hero' | 'map' | 'battle' | 'training' | 'market';
+export interface HeroProgressSnapshot {
+  before: {
+    level: number;
+    xp: number;
+    coins: number;
+  };
+  after: {
+    level: number;
+    xp: number;
+    coins: number;
+  };
+  levelUps: string[];
+}
+
+export interface PostBattleRewards {
+  enemyName: string;
+  enemyArtwork?: VisualAsset;
+  xpEarned: number;
+  coinsEarned: number;
+  items: BattleRewardItem[];
+  heroProgress: HeroProgressSnapshot;
+}
+
+export type GameView =
+  | 'create'
+  | 'hero'
+  | 'map'
+  | 'battle'
+  | 'training'
+  | 'market'
+  | 'post-battle';
 
 export interface GameState {
   hero: Hero | null;
@@ -115,6 +155,7 @@ export interface GameState {
   battle: BattleState | null;
   message: string | null;
   marketInventory: MarketItem[];
+  postBattleRewards: PostBattleRewards | null;
 }
 
 export interface PersistedState {
