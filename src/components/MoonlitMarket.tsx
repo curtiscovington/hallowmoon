@@ -16,20 +16,31 @@ export function MoonlitMarket() {
     const affordable = hero.coins >= item.cost;
     return (
       <li key={item.key} className="market-card__item">
-        <div>
-          <h3 className="market-card__item-title">{item.name}</h3>
-          <p className="market-card__item-detail">{item.description}</p>
-        </div>
-        <div className="market-card__item-actions">
-          <span className="market-card__item-cost">Cost: {item.cost} coins</span>
-          <button
-            type="button"
-            className="small-button"
-            disabled={!affordable}
-            onClick={() => buyFromMarket(item.key)}
-          >
-            {affordable ? 'Purchase' : 'Need more coins'}
-          </button>
+        {item.artwork ? (
+          <figure className="visual-panel visual-panel--wide market-card__art">
+            <img className="visual-panel__image" src={item.artwork.src} alt={item.artwork.alt} />
+            <figcaption className="visual-panel__caption">{item.flavor ?? item.description}</figcaption>
+            {item.artwork.credit ? (
+              <span className="visual-panel__credit">Art: {item.artwork.credit}</span>
+            ) : null}
+          </figure>
+        ) : null}
+        <div className="market-card__item-body">
+          <div>
+            <h3 className="market-card__item-title">{item.name}</h3>
+            <p className="market-card__item-detail">{item.description}</p>
+          </div>
+          <div className="market-card__item-actions">
+            <span className="market-card__item-cost">Cost: {item.cost} coins</span>
+            <button
+              type="button"
+              className="small-button"
+              disabled={!affordable}
+              onClick={() => buyFromMarket(item.key)}
+            >
+              {affordable ? 'Purchase' : 'Need more coins'}
+            </button>
+          </div>
         </div>
       </li>
     );

@@ -2,6 +2,12 @@ export type Species = 'Werewolf' | 'Vampire';
 export type LocationKey = 'village' | 'forest' | 'ruins';
 export type TrainableStat = 'str' | 'agi' | 'wis';
 
+export interface VisualAsset {
+  src: string;
+  alt: string;
+  credit?: string;
+}
+
 export type MarketItemKey =
   | 'moon-tonic'
   | 'silvered-armaments'
@@ -13,6 +19,8 @@ export interface MarketItem {
   name: string;
   description: string;
   cost: number;
+  artwork?: VisualAsset;
+  flavor?: string;
 }
 
 export interface Hero {
@@ -79,6 +87,7 @@ export interface Enemy {
   xp: number;
   description: string;
   moves: EnemyMove[];
+  artwork?: VisualAsset;
 }
 
 export interface BattleState {

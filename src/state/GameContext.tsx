@@ -18,6 +18,7 @@ import {
   Species,
   TrainableStat
 } from './types';
+import { marketCompendium } from '../content/compendium';
 
 interface GameContextValue {
   state: GameState;
@@ -49,54 +50,47 @@ const defaultState: GameState = {
 type MarketEffectResult = { hero: Hero; message: string };
 type MarketEffect = (hero: Hero) => MarketEffectResult;
 
-const MARKET_CATALOG: Record<MarketItemKey, MarketItem & { apply: MarketEffect }> = {
-  'moon-tonic': {
-    key: 'moon-tonic',
-    name: 'Moon Tonic',
-    description: 'Brewed silverleaf restores your vitality and spirit instantly.',
-    cost: 12,
-    apply: (hero) => ({
-      hero: { ...hero, currentHp: hero.maxHp, energy: hero.maxEnergy },
-      message: 'You feel moonlight flood your veins. HP and energy fully restored.'
-    })
+const MARKET_EFFECTS: Record<MarketItemKey, MarketEffect> = {
+  'moon-tonic': (hero) => ({
+    hero: { ...hero, currentHp: hero.maxHp, energy: hero.maxEnergy },
+    message: 'You feel moonlight flood your veins. HP and energy fully restored.'
+  }),
+  'silvered-armaments': (hero) => ({
+    hero: { ...hero, str: hero.str + 1, agi: hero.agi + 1 },
+    message: 'Steel sings in your grip. Strength and agility rise by 1.'
+  }),
+  'occult-primer': (hero) => {
+    const maxEnergy = hero.maxEnergy + 1;
+    return {
+      hero: { ...hero, wis: hero.wis + 1, maxEnergy, energy: maxEnergy },
+      message: 'Mystic insights bloom. Wisdom and max energy each increase by 1.'
+    };
   },
-  'silvered-armaments': {
-    key: 'silvered-armaments',
-    name: 'Silvered Armaments',
-    description: 'Refined blades tuned by hunters grant +1 STR and +1 AGI.',
-    cost: 20,
-    apply: (hero) => ({
-      hero: { ...hero, str: hero.str + 1, agi: hero.agi + 1 },
-      message: 'Steel sings in your grip. Strength and agility rise by 1.'
-    })
-  },
-  'occult-primer': {
-    key: 'occult-primer',
-    name: 'Occult Primer',
-    description: 'Esoteric study increases your WIS by 1 and max energy by 1.',
-    cost: 18,
-    apply: (hero) => {
-      const maxEnergy = hero.maxEnergy + 1;
-      return {
-        hero: { ...hero, wis: hero.wis + 1, maxEnergy, energy: maxEnergy },
-        message: 'Mystic insights bloom. Wisdom and max energy each increase by 1.'
-      };
-    }
-  },
-  'lunar-wardstone': {
-    key: 'lunar-wardstone',
-    name: 'Lunar Wardstone',
-    description: 'Carved wards grant +10 max HP and mend your wounds.',
-    cost: 16,
-    apply: (hero) => {
-      const maxHp = hero.maxHp + 10;
-      return {
-        hero: { ...hero, maxHp, currentHp: maxHp },
-        message: 'Protective sigils glow. Max HP rises by 10 and wounds close.'
-      };
-    }
+  'lunar-wardstone': (hero) => {
+    const maxHp = hero.maxHp + 10;
+    return {
+      hero: { ...hero, maxHp, currentHp: maxHp },
+      message: 'Protective sigils glow. Max HP rises by 10 and wounds close.'
+    };
   }
 };
+
+const MARKET_CATALOG: Record<MarketItemKey, MarketItem & { apply: MarketEffect }> = (() => {
+  const catalog = {} as Record<MarketItemKey, MarketItem & { apply: MarketEffect }>;
+  (Object.keys(marketCompendium) as MarketItemKey[]).forEach((key) => {
+    const entry = marketCompendium[key];
+    catalog[key] = {
+      key,
+      name: entry.name,
+      description: entry.description,
+      cost: entry.cost,
+      flavor: entry.flavor,
+      artwork: entry.image,
+      apply: MARKET_EFFECTS[key]
+    };
+  });
+  return catalog;
+})();
 
 function generateMarketInventory(): MarketItem[] {
   const entries = Object.values(MARKET_CATALOG);
@@ -107,11 +101,13 @@ function generateMarketInventory(): MarketItem[] {
     shuffled[index] = shuffled[swapIndex];
     shuffled[swapIndex] = temp;
   }
-  return shuffled.slice(0, 3).map(({ key, name, description, cost }) => ({
+  return shuffled.slice(0, 3).map(({ key, name, description, cost, flavor, artwork }) => ({
     key,
     name,
     description,
-    cost
+    cost,
+    flavor,
+    artwork
   }));
 }
 

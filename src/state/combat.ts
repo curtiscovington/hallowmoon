@@ -8,6 +8,7 @@ import {
   PendingAction,
   Species
 } from './types';
+import { encounterTable, monsterCompendium } from '../content/compendium';
 
 export const HERO_MOVES: Record<Species, BattleMove[]> = {
   Werewolf: [
@@ -66,81 +67,29 @@ export const HERO_MOVES: Record<Species, BattleMove[]> = {
   ]
 };
 
-interface EnemyTemplate {
-  id: string;
-  name: string;
-  species: Species;
-  maxHp: number;
-  str: number;
-  agi: number;
-  wis: number;
-  coins: number;
-  xp: number;
-  description: string;
-}
-
-const ENCOUNTERS: Record<LocationKey, EnemyTemplate[]> = {
-  village: [
-    {
-      id: 'sparring-adept',
-      name: 'Sparring Adept',
-      species: 'Vampire',
-      maxHp: 28,
-      str: 6,
-      agi: 6,
-      wis: 5,
-      coins: 8,
-      xp: 18,
-      description: 'A friendly rival from the guild testing your footing.'
-    }
-  ],
-  forest: [
-    {
-      id: 'feral-stalker',
-      name: 'Feral Stalker',
-      species: 'Werewolf',
-      maxHp: 34,
-      str: 9,
-      agi: 7,
-      wis: 4,
-      coins: 14,
-      xp: 28,
-      description: 'A moon-maddened predator prowling the dusk.'
-    }
-  ],
-  ruins: [
-    {
-      id: 'ancient-wraith',
-      name: 'Ancient Wraith',
-      species: 'Vampire',
-      maxHp: 40,
-      str: 8,
-      agi: 6,
-      wis: 10,
-      coins: 20,
-      xp: 35,
-      description: 'A relic guardian wielding forgotten moonfire.'
-    }
-  ]
-};
-
 function scaleValue(base: number, level: number): number {
   const multiplier = 1 + (level - 1) * 0.12;
   return Math.round(base * multiplier);
 }
 
 export function createEnemy(location: LocationKey, heroLevel: number): Enemy {
-  const templatePool = ENCOUNTERS[location];
-  const template = templatePool[Math.floor(Math.random() * templatePool.length)];
+  const encounterIds = encounterTable[location];
+  const enemyId = encounterIds[Math.floor(Math.random() * encounterIds.length)];
+  const blueprint = monsterCompendium[enemyId];
+  const base = blueprint.baseStats;
   return {
-    ...template,
-    maxHp: scaleValue(template.maxHp, heroLevel),
-    str: scaleValue(template.str, heroLevel),
-    agi: scaleValue(template.agi, heroLevel),
-    wis: scaleValue(template.wis, heroLevel),
-    coins: template.coins + heroLevel * 3,
-    xp: template.xp + heroLevel * 4,
-    moves: template.species === 'Werewolf'
+    id: blueprint.id,
+    name: blueprint.name,
+    species: blueprint.species,
+    maxHp: scaleValue(base.maxHp, heroLevel),
+    str: scaleValue(base.str, heroLevel),
+    agi: scaleValue(base.agi, heroLevel),
+    wis: scaleValue(base.wis, heroLevel),
+    coins: base.coins + heroLevel * 3,
+    xp: base.xp + heroLevel * 4,
+    description: blueprint.summary,
+    artwork: blueprint.image,
+    moves: blueprint.species === 'Werewolf'
       ? [
           {
             key: 'slash',
