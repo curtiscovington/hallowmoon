@@ -1,8 +1,11 @@
+import { APP_VERSION } from '../version';
 import { useGame } from '../state/GameContext';
 
 export function StatsPanel() {
   const {
-    state: { hero }
+    state: { hero, view },
+    goToMap,
+    resetGame
   } = useGame();
 
   if (!hero) {
@@ -11,43 +14,48 @@ export function StatsPanel() {
 
   const xpToNext = 60 + (hero.level - 1) * 25;
 
+  const stats = [
+    { label: 'Coins', value: hero.coins },
+    { label: 'XP', value: `${hero.xp}/${xpToNext}` },
+    { label: 'Strength', value: hero.str },
+    { label: 'Agility', value: hero.agi },
+    { label: 'Wisdom', value: hero.wis },
+    { label: 'HP', value: `${hero.currentHp}/${hero.maxHp}` },
+    { label: 'Energy', value: `${hero.energy}/${hero.maxEnergy}` }
+  ];
+
+  const showReturnToMap = view !== 'map';
+
   return (
-    <section className="card" style={{ marginTop: '1.5rem' }}>
-      <h3 style={{ marginTop: 0 }}>Attributes</h3>
-      <div className="stats-grid">
+    <section className="card hero-summary" aria-label="Hero overview">
+      <header className="hero-summary__header">
         <div>
-          <strong>Level</strong>
-          <p style={{ margin: 0 }}>{hero.level}</p>
+          <h2 className="hero-summary__name">{hero.name}</h2>
+          <span className="hero-summary__species">{hero.species}</span>
         </div>
-        <div>
-          <strong>Coins</strong>
-          <p style={{ margin: 0 }}>{hero.coins}</p>
-        </div>
-        <div>
-          <strong>XP</strong>
-          <p style={{ margin: 0 }}>{hero.xp}/{xpToNext}</p>
-        </div>
-        <div>
-          <strong>Strength</strong>
-          <p style={{ margin: 0 }}>{hero.str}</p>
-        </div>
-        <div>
-          <strong>Agility</strong>
-          <p style={{ margin: 0 }}>{hero.agi}</p>
-        </div>
-        <div>
-          <strong>Wisdom</strong>
-          <p style={{ margin: 0 }}>{hero.wis}</p>
-        </div>
-        <div>
-          <strong>HP</strong>
-          <p style={{ margin: 0 }}>{hero.currentHp}/{hero.maxHp}</p>
-        </div>
-        <div>
-          <strong>Energy</strong>
-          <p style={{ margin: 0 }}>{hero.energy}/{hero.maxEnergy}</p>
-        </div>
+        <span className="hero-summary__level">Lv {hero.level}</span>
+      </header>
+      <div className="hero-summary__grid">
+        {stats.map((stat) => (
+          <div key={stat.label} className="hero-summary__stat">
+            <span className="hero-summary__label">{stat.label}</span>
+            <span className="hero-summary__value">{stat.value}</span>
+          </div>
+        ))}
       </div>
+      <footer className="hero-summary__footer">
+        <div className="hero-summary__meta">Version {APP_VERSION}</div>
+        <div className="hero-summary__actions">
+          {showReturnToMap && (
+            <button type="button" className="small-button" onClick={goToMap}>
+              Back to Map
+            </button>
+          )}
+          <button type="button" className="small-button hero-summary__reset" onClick={resetGame}>
+            Reset Run
+          </button>
+        </div>
+      </footer>
     </section>
   );
 }

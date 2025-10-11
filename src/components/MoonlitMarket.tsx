@@ -15,60 +15,51 @@ export function MoonlitMarket() {
   const renderItem = (item: MarketItem) => {
     const affordable = hero.coins >= item.cost;
     return (
-      <article key={item.key} className="card" style={{ display: 'grid', gap: '0.75rem' }}>
+      <li key={item.key} className="market-card__item">
         <div>
-          <h3 style={{ margin: '0 0 0.25rem 0' }}>{item.name}</h3>
-          <p style={{ margin: 0, opacity: 0.85 }}>{item.description}</p>
+          <h3 className="market-card__item-title">{item.name}</h3>
+          <p className="market-card__item-detail">{item.description}</p>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontWeight: 600 }}>Cost: {item.cost} coins</span>
+        <div className="market-card__item-actions">
+          <span className="market-card__item-cost">Cost: {item.cost} coins</span>
           <button
             type="button"
             className="small-button"
             disabled={!affordable}
             onClick={() => buyFromMarket(item.key)}
-            style={{ opacity: affordable ? 1 : 0.6 }}
           >
             {affordable ? 'Purchase' : 'Need more coins'}
           </button>
         </div>
-      </article>
+      </li>
     );
   };
 
   return (
-    <section className="grid" style={{ gap: '1.5rem' }}>
-      <article className="card" style={{ display: 'grid', gap: '0.75rem' }}>
-        <h2 style={{ margin: 0 }}>Moonlit Market</h2>
-        <p style={{ margin: 0 }}>
-          Lanterns sway in the midnight breeze. Spend your hard-won coins on boons to shape your
-          hunt.
-        </p>
-        <div
-          style={{
-            display: 'flex',
-            gap: '1rem',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}
-        >
-          <span style={{ fontWeight: 600 }}>Your purse: {hero.coins} coins</span>
+    <section className="card market-card" aria-label="Moonlit market">
+      <header className="market-card__header">
+        <div>
+          <h2 className="card__title">Moonlit Market</h2>
+          <p className="card__description">
+            Lanterns sway in the midnight breeze. Spend your hard-won coins on boons to shape your hunt.
+          </p>
+        </div>
+        <div className="market-card__summary">
+          <span className="market-card__purse">Purse: {hero.coins} coins</span>
           <button type="button" className="small-button" onClick={goToMap}>
             Return to Map
           </button>
         </div>
-      </article>
-
+      </header>
       {marketInventory.length > 0 ? (
-        marketInventory.map(renderItem)
+        <ul className="market-card__list">{marketInventory.map(renderItem)}</ul>
       ) : (
-        <article className="card" style={{ display: 'grid', gap: '0.75rem' }}>
-          <h3 style={{ margin: 0 }}>Stalls Closed</h3>
-          <p style={{ margin: 0, opacity: 0.85 }}>
+        <div className="market-card__empty">
+          <h3 className="market-card__empty-title">Stalls Closed</h3>
+          <p className="market-card__empty-detail">
             The merchants have packed up for now. Rest or return later to see fresh curiosities.
           </p>
-        </article>
+        </div>
       )}
     </section>
   );

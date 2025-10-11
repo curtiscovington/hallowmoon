@@ -102,7 +102,7 @@ export function BattleView() {
   const reactionSlots = [heroPending[0] ?? null, heroPending[1] ?? null];
 
   return (
-    <section className="battle-shell" aria-label="Battle interface">
+    <section className="screen-shell battle-shell" aria-label="Battle interface">
       <header className="battle-top card" aria-label="Combatants summary">
         <div className="battle-top__row">
           <article className="combatant-card combatant-card--hero" aria-label={`${hero.name} vitals`}>

@@ -1,9 +1,9 @@
 import { Route, Routes } from 'react-router-dom';
 import { BattleView } from './components/BattleView';
 import { CharacterCreation } from './components/CharacterCreation';
-import { Header } from './components/Header';
 import { MessageBanner } from './components/MessageBanner';
 import { MoonlitMarket } from './components/MoonlitMarket';
+import { StageNavigation } from './components/StageNavigation';
 import { StatsPanel } from './components/StatsPanel';
 import { TrainingGround } from './components/TrainingGround';
 import { WorldMap } from './components/WorldMap';
@@ -16,37 +16,24 @@ function GameScreen() {
 
   if (state.view === 'create') {
     content = <CharacterCreation />;
+  } else if (state.view === 'hero') {
+    content = <StatsPanel />;
   } else if (state.view === 'map') {
-    content = (
-      <>
-        <WorldMap />
-        <StatsPanel />
-      </>
-    );
+    content = <WorldMap />;
   } else if (state.view === 'training') {
-    content = (
-      <>
-        <TrainingGround />
-        <StatsPanel />
-      </>
-    );
+    content = <TrainingGround />;
   } else if (state.view === 'market') {
-    content = (
-      <>
-        <MoonlitMarket />
-        <StatsPanel />
-      </>
-    );
+    content = <MoonlitMarket />;
   } else if (state.view === 'battle') {
     content = <BattleView />;
   }
 
   return (
-    <main>
-      <Header />
+    <div className="game-stage">
       <MessageBanner />
+      {state.hero && state.view !== 'battle' ? <StageNavigation /> : null}
       {content}
-    </main>
+    </div>
   );
 }
 

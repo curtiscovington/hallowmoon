@@ -38,20 +38,46 @@ button:not(:disabled):hover {
   box-shadow: 0 6px 16px rgba(111, 61, 199, 0.45);
 }
 
-main {
-  padding: clamp(0.75rem, 2vw, 1.5rem);
-  max-width: 1100px;
+.game-stage {
+  padding: clamp(0.75rem, 2vw, 1.25rem);
+  width: min(100%, 460px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: clamp(0.75rem, 1.8vh, 1.5rem);
+  align-items: center;
+  gap: clamp(0.75rem, 1.8vh, 1.25rem);
+}
+
+.game-stage > * {
+  width: 100%;
+}
+
+.stage-nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+  gap: 0.5rem;
+}
+
+.stage-nav__button {
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.7rem;
+}
+
+.stage-nav__button--active {
+  background: linear-gradient(135deg, #8e6bff, #4c2ca0);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 10px 26px rgba(103, 68, 190, 0.45);
+  cursor: default;
 }
 
 .card {
   background: rgba(15, 7, 26, 0.75);
   border: 1px solid rgba(165, 134, 255, 0.25);
   border-radius: 1rem;
-  padding: 1.5rem;
+  padding: clamp(1rem, 2.5vw, 1.35rem);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
 }
 
@@ -117,18 +143,20 @@ nav li {
   background: linear-gradient(135deg, #4a2c97, #2c185e);
 }
 
-.battle-shell {
-  width: min(100%, 430px);
-  margin: 0 auto;
+.screen-shell {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.85rem;
 }
 
-.battle-shell .card {
+.screen-shell .card {
   padding: 0.9rem;
   border-radius: 0.95rem;
   gap: 0.65rem;
+}
+
+.battle-shell {
+  gap: 0.75rem;
 }
 
 .battle-top {
@@ -250,6 +278,345 @@ nav li {
 
 .modifier-chip--negative {
   background: rgba(186, 72, 102, 0.6);
+}
+
+.hero-summary {
+  background: rgba(25, 10, 48, 0.82);
+  display: grid;
+  gap: 0.85rem;
+}
+
+.hero-summary__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.hero-summary__name {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+}
+
+.hero-summary__species {
+  font-size: 0.75rem;
+  opacity: 0.75;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-summary__level {
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #d2c9ff;
+}
+
+.hero-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.hero-summary__stat {
+  background: rgba(16, 5, 31, 0.8);
+  border-radius: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.hero-summary__label {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.hero-summary__value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-summary__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(165, 134, 255, 0.15);
+}
+
+.hero-summary__meta {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.hero-summary__actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.hero-summary__actions .small-button {
+  padding-inline: 0.8rem;
+}
+
+.hero-summary__reset {
+  background: linear-gradient(135deg, #b44a5c, #6d1f34);
+}
+
+.message-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  border-left: 4px solid rgba(203, 146, 255, 0.65);
+  background: rgba(34, 17, 56, 0.8);
+}
+
+.message-banner__text {
+  margin: 0;
+  flex: 1;
+}
+
+.card__title {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+}
+
+.card__description {
+  margin: 0;
+  opacity: 0.8;
+  font-size: 0.85rem;
+}
+
+.field-label {
+  display: block;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.creation-card {
+  display: grid;
+  gap: 1rem;
+  background: rgba(24, 9, 44, 0.82);
+}
+
+.creation-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.creation-species {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.creation-species__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.creation-species__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 0.75rem;
+  background: rgba(30, 12, 60, 0.75);
+  border: 1px solid rgba(165, 134, 255, 0.25);
+  cursor: pointer;
+}
+
+.creation-species__option input {
+  margin: 0;
+}
+
+.world-card {
+  display: grid;
+  gap: 0.85rem;
+  background: rgba(24, 9, 44, 0.82);
+}
+
+.world-card__header {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.world-card__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.world-card__node {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(165, 134, 255, 0.2);
+  background: rgba(17, 7, 33, 0.85);
+}
+
+.world-card__node-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.world-card__node-detail {
+  margin: 0;
+  opacity: 0.78;
+  font-size: 0.85rem;
+}
+
+.world-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.training-card {
+  display: grid;
+  gap: 0.85rem;
+  background: rgba(24, 9, 44, 0.82);
+}
+
+.training-card__header {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.training-card__options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.training-card__option {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(165, 134, 255, 0.2);
+  background: rgba(17, 7, 33, 0.85);
+}
+
+.training-card__option-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.95rem;
+}
+
+.training-card__option-detail {
+  margin: 0;
+  opacity: 0.78;
+  font-size: 0.82rem;
+}
+
+.training-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.market-card {
+  display: grid;
+  gap: 0.85rem;
+  background: rgba(24, 9, 44, 0.82);
+}
+
+.market-card__header {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.market-card__summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.market-card__purse {
+  font-weight: 600;
+}
+
+.market-card__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.market-card__item {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(165, 134, 255, 0.2);
+  background: rgba(17, 7, 33, 0.85);
+}
+
+.market-card__item-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.95rem;
+}
+
+.market-card__item-detail {
+  margin: 0;
+  opacity: 0.78;
+  font-size: 0.82rem;
+}
+
+.market-card__item-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.market-card__item-cost {
+  font-weight: 600;
+}
+
+.market-card__empty {
+  padding: 0.85rem;
+  border-radius: 0.85rem;
+  border: 1px dashed rgba(165, 134, 255, 0.25);
+  background: rgba(17, 7, 33, 0.6);
+  display: grid;
+  gap: 0.4rem;
+}
+
+.market-card__empty-title {
+  margin: 0;
+}
+
+.market-card__empty-detail {
+  margin: 0;
+  opacity: 0.78;
+  font-size: 0.85rem;
 }
 
 .battle-top__center {
@@ -633,10 +1000,60 @@ nav li {
   .battle-reactions__slots {
     grid-template-columns: 1fr;
   }
+
+  .hero-summary__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .message-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .message-banner__text {
+    width: 100%;
+  }
+
+  .hero-summary__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hero-summary__actions {
+    width: 100%;
+  }
+
+  .hero-summary__actions .small-button {
+    flex: 1 1 auto;
+  }
+
+  .training-card__option {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .training-card__option button {
+    width: 100%;
+  }
+
+  .market-card__summary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .market-card__item-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .world-card__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 @media (max-width: 420px) {
-  main {
+  .game-stage {
     padding: 0.75rem 0.75rem 1rem;
   }
 

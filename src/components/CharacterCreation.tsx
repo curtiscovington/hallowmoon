@@ -18,13 +18,17 @@ export function CharacterCreation() {
   };
 
   return (
-    <section className="card" style={{ maxWidth: '600px', margin: '0 auto' }}>
-      <h2>Create Your Legend</h2>
-      <p style={{ opacity: 0.8 }}>
-        Choose your nature beneath the moon. Each path offers unique talents in battle.
-      </p>
-      <form onSubmit={handleSubmit} className="grid">
-        <label htmlFor="name">Name</label>
+    <section className="card creation-card">
+      <div>
+        <h2 className="card__title">Create Your Legend</h2>
+        <p className="card__description">
+          Choose your nature beneath the moon. Each path offers unique talents in battle.
+        </p>
+      </div>
+      <form onSubmit={handleSubmit} className="creation-form">
+        <label className="field-label" htmlFor="name">
+          Name
+        </label>
         <input
           id="name"
           name="name"
@@ -34,18 +38,17 @@ export function CharacterCreation() {
           required
           maxLength={24}
         />
-        <div>
-          <span style={{ display: 'block', marginBottom: '0.5rem' }}>Species</span>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <div className="creation-species">
+          <span className="field-label">Species</span>
+          <div className="creation-species__options">
             {speciesOptions.map((option) => (
-              <label key={option} style={{ cursor: 'pointer' }}>
+              <label key={option} className="creation-species__option">
                 <input
                   type="radio"
                   name="species"
                   value={option}
                   checked={species === option}
                   onChange={() => setSpecies(option)}
-                  style={{ marginRight: '0.35rem' }}
                 />
                 {option}
               </label>
