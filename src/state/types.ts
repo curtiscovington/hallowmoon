@@ -139,10 +139,63 @@ export interface PostBattleRewards {
   heroProgress: HeroProgressSnapshot;
 }
 
+export type RunOptionType = 'battle' | 'event' | 'retreat';
+
+export type RunEventPayload =
+  | { kind: 'heal'; amount: number }
+  | { kind: 'energy'; amount: number }
+  | { kind: 'coins'; amount: number }
+  | { kind: 'relic' };
+
+export interface RunOption {
+  id: string;
+  type: RunOptionType;
+  label: string;
+  description: string;
+  payload?: RunEventPayload;
+}
+
+export type RunRelicEffect =
+  | { kind: 'post-battle-heal'; amount: number }
+  | { kind: 'pre-battle-energy'; amount: number }
+  | { kind: 'extra-option'; amount: number }
+  | { kind: 'bonus-coins'; amount: number };
+
+export interface RunRelic {
+  id: string;
+  name: string;
+  description: string;
+  effect: RunRelicEffect;
+}
+
+export interface RunStepLog {
+  depth: number;
+  choice: string;
+  summary: string;
+}
+
+export interface RunState {
+  depth: number;
+  relics: RunRelic[];
+  options: RunOption[];
+  log: RunStepLog[];
+  pendingBattle?: { optionId: string; label: string };
+  awaitingNextStep: boolean;
+  completed: boolean;
+  victoryCount: number;
+  pendingMessages: string[];
+}
+
+export interface TownProgress {
+  moonShards: number;
+  blessingLevel: number;
+}
+
 export type GameView =
   | 'create'
   | 'hero'
   | 'map'
+  | 'run'
   | 'battle'
   | 'training'
   | 'market'
@@ -156,10 +209,13 @@ export interface GameState {
   message: string | null;
   marketInventory: MarketItem[];
   postBattleRewards: PostBattleRewards | null;
+  run: RunState | null;
+  townProgress: TownProgress;
 }
 
 export interface PersistedState {
   hero: Hero | null;
   location: LocationKey;
   timestamp: number;
+  townProgress: TownProgress;
 }

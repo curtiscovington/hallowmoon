@@ -1624,6 +1624,238 @@ nav li {
   gap: 0.5rem;
 }
 
+.world-layout {
+  display: grid;
+  gap: 0.9rem;
+}
+
+@media (min-width: 768px) {
+  .world-layout {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  }
+}
+
+.town-card {
+  display: grid;
+  gap: 0.75rem;
+  background: rgba(24, 9, 44, 0.82);
+}
+
+.town-card__header {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.town-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.town-card__stat {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(165, 134, 255, 0.24);
+  background: rgba(17, 7, 33, 0.82);
+  min-width: 8.5rem;
+}
+
+.town-card__stat dt {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.town-card__stat dd {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.town-card__summary,
+.town-card__next,
+.town-card__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.town-card__button {
+  align-self: start;
+}
+
+.town-card__hint {
+  opacity: 0.78;
+}
+
+.run-layout {
+  display: grid;
+  gap: 0.9rem;
+}
+
+@media (min-width: 768px) {
+  .run-layout {
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+  }
+}
+
+.run-card {
+  display: grid;
+  gap: 0.8rem;
+  background: rgba(24, 9, 44, 0.82);
+}
+
+.run-card__header {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.run-card__section {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.run-card__section-title {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
+.run-card__options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.run-card__option {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(165, 134, 255, 0.22);
+  background: rgba(17, 7, 33, 0.82);
+}
+
+.run-card__option--retreat {
+  border-color: rgba(255, 182, 193, 0.45);
+}
+
+.run-card__option-button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.run-card__option-button:focus-visible {
+  outline: 2px solid rgba(205, 184, 255, 0.75);
+  outline-offset: 2px;
+}
+
+.run-card__option-label {
+  font-weight: 600;
+}
+
+.run-card__option-type {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  opacity: 0.7;
+  letter-spacing: 0.06em;
+}
+
+.run-card__option-description {
+  margin: 0;
+  font-size: 0.82rem;
+  opacity: 0.82;
+}
+
+.run-card__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.run-card__relics {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.run-card__relic {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(165, 134, 255, 0.18);
+  background: rgba(17, 7, 33, 0.8);
+}
+
+.run-card__relic-name {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.run-card__relic-description {
+  margin: 0;
+  font-size: 0.78rem;
+  opacity: 0.78;
+}
+
+.run-card__empty {
+  margin: 0;
+  font-size: 0.82rem;
+  opacity: 0.78;
+}
+
+.run-card__log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.run-card__log-entry {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(165, 134, 255, 0.16);
+  background: rgba(17, 7, 33, 0.78);
+}
+
+.run-card__log-depth {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.run-card__log-choice {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.run-card__log-summary {
+  margin: 0;
+  font-size: 0.78rem;
+  opacity: 0.8;
+}
+
 .training-card {
   display: grid;
   gap: 0.85rem;

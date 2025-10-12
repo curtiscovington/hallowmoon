@@ -4,6 +4,7 @@ import { CharacterCreation } from './components/CharacterCreation';
 import { MessageBanner } from './components/MessageBanner';
 import { MoonlitMarket } from './components/MoonlitMarket';
 import { PostBattleSummary } from './components/PostBattleSummary';
+import { RunView } from './components/RunView';
 import { StageNavigation } from './components/StageNavigation';
 import { StatsPanel } from './components/StatsPanel';
 import { TrainingGround } from './components/TrainingGround';
@@ -24,6 +25,10 @@ const viewMeta: Record<GameView, { title: string; tagline: string }> = {
   map: {
     title: 'World Expedition',
     tagline: 'Choose the next moonlit frontier to scout.'
+  },
+  run: {
+    title: 'Whispering Run',
+    tagline: 'Forge your path through shifting moonlit choices.'
   },
   training: {
     title: 'Training Ritual',
@@ -49,7 +54,7 @@ function GameScreen() {
   const meta = viewMeta[state.view];
   const locationName = locationCompendium[state.location]?.name ?? 'Uncharted Wilds';
   const showFooterNav = Boolean(
-    hero && !['battle', 'post-battle'].includes(state.view)
+    hero && !['battle', 'post-battle', 'run'].includes(state.view)
   );
 
   let content: JSX.Element | null = null;
@@ -60,6 +65,8 @@ function GameScreen() {
     content = <StatsPanel />;
   } else if (state.view === 'map') {
     content = <WorldMap />;
+  } else if (state.view === 'run') {
+    content = <RunView />;
   } else if (state.view === 'training') {
     content = <TrainingGround />;
   } else if (state.view === 'market') {

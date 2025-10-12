@@ -19,7 +19,7 @@ export function StageNavigation() {
     visitMarket
   } = useGame();
 
-  if (!hero || view === 'battle') {
+  if (!hero || view === 'battle' || view === 'run') {
     return null;
   }
 

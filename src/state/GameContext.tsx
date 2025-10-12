@@ -11,13 +11,19 @@ import {
   BattleMove,
   BattleState,
   BattleRewardItem,
+  Enemy,
   GameState,
   Hero,
   LocationKey,
   MarketItem,
   MarketItemKey,
   PostBattleRewards,
+  RunOption,
+  RunRelic,
+  RunState,
+  RunStepLog,
   Species,
+  TownProgress,
   TrainableStat
 } from './types';
 import { marketCompendium } from '../content/compendium';
@@ -33,13 +39,19 @@ interface GameContextValue {
   visitMarket: () => void;
   buyFromMarket: (itemKey: MarketItemKey) => void;
   startBattle: (location: LocationKey) => void;
+  beginForestRun: () => void;
+  chooseRunOption: (optionId: string) => void;
+  abandonRun: () => void;
   performHeroMove: (moveKey: string) => void;
   retreat: () => void;
   resetGame: () => void;
   heroMoves: () => BattleMove[];
   dismissMessage: () => void;
   acknowledgeRewards: () => void;
+  purchaseTownBlessing: () => void;
 }
+
+const defaultTownProgress: TownProgress = { moonShards: 0, blessingLevel: 0 };
 
 const defaultState: GameState = {
   hero: null,
@@ -48,7 +60,9 @@ const defaultState: GameState = {
   battle: null,
   message: null,
   marketInventory: [],
-  postBattleRewards: null
+  postBattleRewards: null,
+  run: null,
+  townProgress: { ...defaultTownProgress }
 };
 
 type MarketEffectResult = { hero: Hero; message: string };
@@ -95,6 +109,302 @@ const MARKET_CATALOG: Record<MarketItemKey, MarketItem & { apply: MarketEffect }
   });
   return catalog;
 })();
+
+const RUN_MAX_DEPTH = 5;
+
+type RunRelicKey =
+  | 'moon-thistle-charm'
+  | 'howlstone-totem'
+  | 'twilight-ledger'
+  | 'silvered-compass';
+
+const RUN_RELIC_CATALOG: Record<RunRelicKey, RunRelic> = {
+  'moon-thistle-charm': {
+    id: 'moon-thistle-charm',
+    name: 'Moon-Thistle Charm',
+    description: 'After each victory, restore 8 HP as the charm glows warm.',
+    effect: { kind: 'post-battle-heal', amount: 8 }
+  },
+  'howlstone-totem': {
+    id: 'howlstone-totem',
+    name: 'Howlstone Totem',
+    description: 'Before battles, the totem hums and grants +1 energy.',
+    effect: { kind: 'pre-battle-energy', amount: 1 }
+  },
+  'twilight-ledger': {
+    id: 'twilight-ledger',
+    name: 'Twilight Ledger',
+    description: 'Accountants of dusk skim +6 coins after every encounter.',
+    effect: { kind: 'bonus-coins', amount: 6 }
+  },
+  'silvered-compass': {
+    id: 'silvered-compass',
+    name: 'Silvered Compass',
+    description: 'Reveals one additional path to choose each depth.',
+    effect: { kind: 'extra-option', amount: 1 }
+  }
+};
+
+function cloneRelic(key: RunRelicKey): RunRelic {
+  const relic = RUN_RELIC_CATALOG[key];
+  return { ...relic };
+}
+
+function drawRandomRelic(existing: RunRelic[]): RunRelic | null {
+  const owned = new Set(existing.map((relic) => relic.id));
+  const pool = (Object.keys(RUN_RELIC_CATALOG) as RunRelicKey[]).filter(
+    (key) => !owned.has(key)
+  );
+  if (pool.length === 0) {
+    return null;
+  }
+  const choice = pool[Math.floor(Math.random() * pool.length)];
+  return cloneRelic(choice);
+}
+
+function createRunOptionId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random() * 10000).toString(36)}`;
+}
+
+function createBattleOption(depth: number): RunOption {
+  return {
+    id: createRunOptionId('battle'),
+    type: 'battle',
+    label: `Hunt the prowling chorus (Depth ${depth})`,
+    description: 'Track a feral pack and test your mettle to seize further spoils.'
+  };
+}
+
+function createHealEvent(depth: number): RunOption {
+  const amount = 14 + depth * 3;
+  return {
+    id: createRunOptionId('heal'),
+    type: 'event',
+    label: 'Moonwell Respite',
+    description: `Drink from a radiant pool to restore ${amount} HP.`,
+    payload: { kind: 'heal', amount }
+  };
+}
+
+function createEnergyEvent(depth: number): RunOption {
+  const amount = 1 + Math.floor(depth / 2);
+  return {
+    id: createRunOptionId('energy'),
+    type: 'event',
+    label: 'Starlit Meditation',
+    description: `Meditate beneath silver boughs to regain ${amount} energy.`,
+    payload: { kind: 'energy', amount }
+  };
+}
+
+function createCoinEvent(depth: number): RunOption {
+  const amount = 16 + depth * 4;
+  return {
+    id: createRunOptionId('cache'),
+    type: 'event',
+    label: 'Silversap Cache',
+    description: `Harvest rare sap worth ${amount} coins at market.`,
+    payload: { kind: 'coins', amount }
+  };
+}
+
+function createRelicEvent(): RunOption {
+  return {
+    id: createRunOptionId('relic'),
+    type: 'event',
+    label: 'Hidden Reliquary',
+    description: 'Search a moonlit den for a relic that bends the run in your favour.',
+    payload: { kind: 'relic' }
+  };
+}
+
+function createRetreatOption(completed: boolean): RunOption {
+  return {
+    id: createRunOptionId('retreat'),
+    type: 'retreat',
+    label: completed ? 'Return with Triumph' : 'Withdraw to Silverfen',
+    description: completed
+      ? 'The heart of the forest quiets. Carry your legend and moonshards back to town.'
+      : 'Leave the forest now, banking your gathered moonshards and regrouping in the village.'
+  };
+}
+
+function shuffleOptions<T>(list: T[]): T[] {
+  const copy = [...list];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const j = Math.floor(Math.random() * (index + 1));
+    const temp = copy[index];
+    copy[index] = copy[j];
+    copy[j] = temp;
+  }
+  return copy;
+}
+
+function extraOptionsFromRelics(relics: RunRelic[]): number {
+  return relics.reduce((total, relic) => {
+    if (relic.effect.kind === 'extra-option') {
+      return total + relic.effect.amount;
+    }
+    return total;
+  }, 0);
+}
+
+function bonusCoinsFromRelics(relics: RunRelic[]): number {
+  return relics.reduce((total, relic) => {
+    if (relic.effect.kind === 'bonus-coins') {
+      return total + relic.effect.amount;
+    }
+    return total;
+  }, 0);
+}
+
+function applyEncounterCoinBonus(relics: RunRelic[], hero: Hero, messages: string[]): void {
+  const bonus = bonusCoinsFromRelics(relics);
+  if (bonus > 0) {
+    hero.coins += bonus;
+    messages.push(`Twilight ledgers tally +${bonus} coins.`);
+  }
+}
+
+function createRunChoices(
+  depth: number,
+  relics: RunRelic[]
+): { options: RunOption[]; completed: boolean } {
+  if (depth > RUN_MAX_DEPTH) {
+    return {
+      options: [createRetreatOption(true)],
+      completed: true
+    };
+  }
+  const options: RunOption[] = [createBattleOption(depth)];
+  const library = shuffleOptions([
+    createHealEvent(depth),
+    createEnergyEvent(depth),
+    createCoinEvent(depth),
+    createRelicEvent()
+  ]);
+  const eventCount = Math.min(library.length, 1 + extraOptionsFromRelics(relics));
+  for (let index = 0; index < eventCount; index += 1) {
+    options.push(library[index]);
+  }
+  options.push(createRetreatOption(false));
+  return { options, completed: false };
+}
+
+const STARTING_RELIC_TIERS: RunRelicKey[][] = [
+  [],
+  ['moon-thistle-charm'],
+  ['moon-thistle-charm', 'howlstone-totem'],
+  ['moon-thistle-charm', 'howlstone-totem', 'twilight-ledger'],
+  ['moon-thistle-charm', 'howlstone-totem', 'twilight-ledger', 'silvered-compass']
+];
+
+export const MAX_BLESSING_LEVEL = STARTING_RELIC_TIERS.length - 1;
+
+const BLESSING_BASE_COST = 8;
+const BLESSING_STEP_COST = 6;
+
+export function getBlessingUpgradeCost(level: number): number {
+  if (level >= MAX_BLESSING_LEVEL) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return BLESSING_BASE_COST + level * BLESSING_STEP_COST;
+}
+
+const BLESSING_DESCRIPTIONS = [
+  'Invest moonshards to awaken sanctuary boons for future forest runs.',
+  'Blessing I: Begin runs with the Moon-Thistle Charm (post-battle healing).',
+  'Blessing II: Carry the Howlstone Totem as well (pre-battle energy).',
+  'Blessing III: Twilight Ledger keepers tithe +6 coins per encounter.',
+  'Blessing IV: The Silvered Compass reveals an extra choice each depth.'
+];
+
+export function describeBlessingLevel(level: number): string {
+  const clamped = Math.max(0, Math.min(level, BLESSING_DESCRIPTIONS.length - 1));
+  return BLESSING_DESCRIPTIONS[clamped];
+}
+
+function startingRelicsForLevel(level: number): RunRelic[] {
+  const clamped = Math.max(0, Math.min(level, MAX_BLESSING_LEVEL));
+  const keys = STARTING_RELIC_TIERS[clamped];
+  return keys.map((key) => cloneRelic(key));
+}
+
+function computeMoonShardReward(run: RunState, outcome: 'completed' | 'retreat' | 'failure'): number {
+  const base = Math.max(1, run.depth - 1);
+  const victoryBonus = run.victoryCount;
+  const completionBonus = outcome === 'completed' ? 3 : 0;
+  const penalty = outcome === 'failure' ? 2 : 0;
+  return Math.max(0, base + victoryBonus + completionBonus - penalty);
+}
+
+function buildBattleState(hero: Hero, enemy: Enemy): BattleState {
+  const heroTurn = hero.agi >= enemy.agi ? 'hero' : 'enemy';
+  return {
+    enemy,
+    heroHp: hero.currentHp,
+    enemyHp: enemy.maxHp,
+    heroStrMod: 0,
+    heroWisMod: 0,
+    heroAgiMod: 0,
+    enemyStrMod: 0,
+    enemyAgiMod: 0,
+    heroStatuses: [],
+    enemyStatuses: [],
+    pendingActions: [],
+    log: [
+      `${enemy.name} appears amidst the shadows.`,
+      ...(heroTurn === 'enemy'
+        ? [`${enemy.name} strikes first!`]
+        : ['You seize the initiative.'])
+    ],
+    turn: heroTurn as BattleState['turn']
+  } satisfies BattleState;
+}
+
+function applyRunBattleVictory(
+  run: RunState | null,
+  hero: Hero,
+  battle: BattleState
+): { run: RunState | null; hero: Hero; messages: string[] } {
+  if (!run || !run.pendingBattle) {
+    return { run, hero, messages: [] };
+  }
+  const messages: string[] = [];
+  run.relics.forEach((relic) => {
+    if (relic.effect.kind === 'post-battle-heal') {
+      const before = hero.currentHp;
+      hero.currentHp = Math.min(hero.maxHp, hero.currentHp + relic.effect.amount);
+      const healed = hero.currentHp - before;
+      if (healed > 0) {
+        messages.push(`${relic.name} knits wounds for ${healed} HP.`);
+      }
+    }
+  });
+  applyEncounterCoinBonus(run.relics, hero, messages);
+  const nextDepth = run.depth + 1;
+  const { options: nextOptions, completed } = createRunChoices(nextDepth, run.relics);
+  const logEntry: RunStepLog = {
+    depth: run.depth,
+    choice: run.pendingBattle.label,
+    summary: `Defeated ${battle.enemy.name}.`
+  };
+  return {
+    hero,
+    messages,
+    run: {
+      ...run,
+      depth: nextDepth,
+      options: nextOptions,
+      completed,
+      awaitingNextStep: true,
+      pendingBattle: undefined,
+      pendingMessages: messages,
+      log: [...run.log, logEntry],
+      victoryCount: run.victoryCount + 1
+    }
+  };
+}
 
 type LootDefinition = BattleRewardItem & {
   dropRate: number;
@@ -272,10 +582,20 @@ function withPersistence(
 ) {
   setState((previous) => {
     const next = updater(previous);
-    if (next.hero) {
-      saveGame({ hero: next.hero, location: next.location, timestamp: Date.now() });
-    } else {
+    const persisted = {
+      hero: next.hero,
+      location: next.location,
+      timestamp: Date.now(),
+      townProgress: next.townProgress
+    };
+    if (
+      !persisted.hero &&
+      persisted.townProgress.moonShards === 0 &&
+      persisted.townProgress.blessingLevel === 0
+    ) {
       clearGame();
+    } else {
+      saveGame(persisted);
     }
     return next;
   });
@@ -284,6 +604,7 @@ function withPersistence(
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<GameState>(() => {
     const stored = loadGame();
+    const storedProgress = stored?.townProgress ?? { ...defaultTownProgress };
     if (stored?.hero) {
       return {
         hero: stored.hero,
@@ -292,10 +613,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         battle: null,
         message: `Welcome back, ${stored.hero.name}.`,
         marketInventory: generateMarketInventory(),
-        postBattleRewards: null
+        postBattleRewards: null,
+        run: null,
+        townProgress: storedProgress
       };
     }
-    return { ...defaultState };
+    return { ...defaultState, townProgress: storedProgress };
   });
 
   const updateState = React.useCallback(
@@ -304,16 +627,52 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const concludeRun = React.useCallback(
+    (
+      current: GameState,
+      hero: Hero,
+      run: RunState,
+      outcome: 'completed' | 'retreat' | 'failure'
+    ): GameState => {
+      const shards = computeMoonShardReward(run, outcome);
+      const townProgress: TownProgress = {
+        ...current.townProgress,
+        moonShards: current.townProgress.moonShards + shards
+      };
+      const descriptor =
+        outcome === 'completed'
+          ? 'You conquer the heart of the Whispering Forest.'
+          : outcome === 'failure'
+          ? 'You flee the forest, clutching what shards you can.'
+          : 'You withdraw before the forest can claim more strength.';
+      const shardLine = ` Moonshards secured: ${shards}.`;
+      return {
+        ...current,
+        hero,
+        location: 'village',
+        view: 'map',
+        battle: null,
+        postBattleRewards: null,
+        message: `${descriptor}${shardLine}`,
+        run: null,
+        townProgress
+      } satisfies GameState;
+    },
+    []
+  );
+
   const createHero = React.useCallback(
     (name: string, species: Species) => {
-      updateState(() => ({
+      updateState((current) => ({
         hero: generateHero(name, species),
         location: 'village',
         view: 'map',
         battle: null,
         message: `Welcome to HallowMoon, ${name}.`,
         marketInventory: generateMarketInventory(),
-        postBattleRewards: null
+        postBattleRewards: null,
+        run: null,
+        townProgress: current.townProgress
       }));
     },
     [updateState]
@@ -426,8 +785,46 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         location: 'village',
         hero,
         message: 'A calm night passes. Your strength is restored.',
-        postBattleRewards: null
+        postBattleRewards: null,
+        run: null
       };
+    });
+  }, [updateState]);
+
+  const beginForestRun = React.useCallback(() => {
+    updateState((current) => {
+      if (!current.hero) {
+        return current;
+      }
+      const hero = { ...current.hero };
+      const relics = startingRelicsForLevel(current.townProgress.blessingLevel);
+      const { options, completed } = createRunChoices(1, relics);
+      const messageParts = ['You step beneath the whispering canopy.'];
+      if (relics.length > 0) {
+        const relicNames = relics.map((relic) => relic.name).join(', ');
+        messageParts.push(`Sanctuary blessings arm you with ${relicNames}.`);
+      }
+      return {
+        ...current,
+        hero,
+        location: 'forest',
+        view: 'run',
+        battle: null,
+        message: messageParts.join(' '),
+        marketInventory: current.marketInventory,
+        postBattleRewards: null,
+        run: {
+          depth: 1,
+          relics,
+          options,
+          log: [],
+          pendingBattle: undefined,
+          awaitingNextStep: false,
+          completed,
+          victoryCount: 0,
+          pendingMessages: []
+        }
+      } satisfies GameState;
     });
   }, [updateState]);
 
@@ -438,39 +835,187 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           return current;
         }
         const enemy = createEnemy(location, current.hero.level);
-        const heroTurn = current.hero.agi >= enemy.agi ? 'hero' : 'enemy';
-        const battle = {
-          enemy,
-          heroHp: current.hero.currentHp,
-          enemyHp: enemy.maxHp,
-          heroStrMod: 0,
-          heroWisMod: 0,
-          heroAgiMod: 0,
-          enemyStrMod: 0,
-          enemyAgiMod: 0,
-          heroStatuses: [],
-          enemyStatuses: [],
-          pendingActions: [],
-          log: [
-            `${enemy.name} appears amidst the shadows.`,
-            ...(heroTurn === 'enemy'
-              ? [`${enemy.name} strikes first!`]
-              : ['You seize the initiative.'])
-          ],
-          turn: heroTurn as BattleState['turn']
-        } satisfies BattleState;
+        const battle = buildBattleState(current.hero, enemy);
         return {
           ...current,
           location,
           view: 'battle',
           battle,
           message: null,
-          postBattleRewards: null
+          postBattleRewards: null,
+          run: null
         };
       });
     },
     [updateState]
   );
+
+  const chooseRunOption = React.useCallback(
+    (optionId: string) => {
+      updateState((current) => {
+        if (!current.hero || !current.run) {
+          return current;
+        }
+        const run = current.run;
+        const option = run.options.find((entry) => entry.id === optionId);
+        if (!option) {
+          return current;
+        }
+        const hero = { ...current.hero };
+        const runMessages: string[] = [];
+
+        if (option.type === 'retreat') {
+          return concludeRun(current, hero, run, run.completed ? 'completed' : 'retreat');
+        }
+
+        if (option.type === 'battle') {
+          run.relics.forEach((relic) => {
+            if (relic.effect.kind === 'pre-battle-energy') {
+              const before = hero.energy;
+              hero.energy = Math.min(hero.maxEnergy, hero.energy + relic.effect.amount);
+              const gained = hero.energy - before;
+              if (gained > 0) {
+                runMessages.push(`${relic.name} grants +${gained} energy.`);
+              }
+            }
+          });
+          const heroLevelOffset = Math.floor((run.depth - 1) / 2);
+          const enemy = createEnemy('forest', Math.max(1, hero.level + heroLevelOffset));
+          const battle = buildBattleState(hero, enemy);
+          const message = runMessages.length > 0 ? runMessages.join(' ') : null;
+          return {
+            ...current,
+            hero,
+            location: 'forest',
+            view: 'battle',
+            battle,
+            message,
+            postBattleRewards: null,
+            run: {
+              ...run,
+              pendingBattle: { optionId: option.id, label: option.label },
+              options: [],
+              awaitingNextStep: false,
+              pendingMessages: []
+            }
+          } satisfies GameState;
+        }
+
+        const updatedRelics = [...run.relics];
+        const logFragments: string[] = [];
+        if (option.payload?.kind === 'heal') {
+          const before = hero.currentHp;
+          hero.currentHp = Math.min(hero.maxHp, hero.currentHp + option.payload.amount);
+          const healed = hero.currentHp - before;
+          if (healed > 0) {
+            runMessages.push(`Moonwell waters mend ${healed} HP.`);
+            logFragments.push(`Healed ${healed} HP.`);
+          } else {
+            runMessages.push('Moonwell waters offer comfort, but you are already at full strength.');
+            logFragments.push('Healing wasted; HP already full.');
+          }
+        } else if (option.payload?.kind === 'energy') {
+          const before = hero.energy;
+          hero.energy = Math.min(hero.maxEnergy, hero.energy + option.payload.amount);
+          const restored = hero.energy - before;
+          if (restored > 0) {
+            runMessages.push(`Starlit breaths restore ${restored} energy.`);
+            logFragments.push(`Recovered ${restored} energy.`);
+          } else {
+            runMessages.push('Your essence is already brimming with power.');
+            logFragments.push('Energy already full.');
+          }
+        } else if (option.payload?.kind === 'coins') {
+          hero.coins += option.payload.amount;
+          runMessages.push(`Silversap trades for +${option.payload.amount} coins.`);
+          logFragments.push(`Gained ${option.payload.amount} coins.`);
+        } else if (option.payload?.kind === 'relic') {
+          const relic = drawRandomRelic(updatedRelics);
+          if (relic) {
+            updatedRelics.push(relic);
+            runMessages.push(`You recover the relic ${relic.name}.`);
+            logFragments.push(`Claimed relic ${relic.name}.`);
+          } else {
+            const fallback = 12;
+            hero.coins += fallback;
+            runMessages.push('The cache lies empty, but you salvage +12 coins.');
+            logFragments.push('Relic cache empty; recovered 12 coins instead.');
+          }
+        }
+
+        applyEncounterCoinBonus(updatedRelics, hero, runMessages);
+
+        const nextDepth = run.depth + 1;
+        const { options: nextOptions, completed } = createRunChoices(nextDepth, updatedRelics);
+        const summaryText = logFragments.join(' ') || option.description;
+        const logEntry: RunStepLog = {
+          depth: run.depth,
+          choice: option.label,
+          summary: summaryText
+        };
+        const baseMessage = runMessages.join(' ') || option.description;
+        const followUp = completed
+          ? 'The heart of the forest falls quiet. Return when you are ready.'
+          : `New paths unfurl at depth ${nextDepth}.`;
+
+        return {
+          ...current,
+          hero,
+          run: {
+            ...run,
+            depth: nextDepth,
+            relics: updatedRelics,
+            options: nextOptions,
+            completed,
+            awaitingNextStep: false,
+            pendingBattle: undefined,
+            pendingMessages: [],
+            log: [...run.log, logEntry]
+          },
+          message: `${baseMessage} ${followUp}`.trim()
+        } satisfies GameState;
+      });
+    },
+    [concludeRun, updateState]
+  );
+
+  const abandonRun = React.useCallback(() => {
+    updateState((current) => {
+      if (!current.hero || !current.run) {
+        return current;
+      }
+      return concludeRun(current, current.hero, current.run, 'retreat');
+    });
+  }, [concludeRun, updateState]);
+
+  const purchaseTownBlessing = React.useCallback(() => {
+    updateState((current) => {
+      const cost = getBlessingUpgradeCost(current.townProgress.blessingLevel);
+      if (Number.isInfinity(cost)) {
+        return {
+          ...current,
+          message: 'The sanctuary already resonates with every blessing we can invoke.'
+        };
+      }
+      if (current.townProgress.moonShards < cost) {
+        const deficit = cost - current.townProgress.moonShards;
+        return {
+          ...current,
+          message: `You require ${deficit} more moonshards to empower the sanctuary.`
+        };
+      }
+      const nextLevel = Math.min(current.townProgress.blessingLevel + 1, MAX_BLESSING_LEVEL);
+      const nextProgress: TownProgress = {
+        moonShards: current.townProgress.moonShards - cost,
+        blessingLevel: nextLevel
+      };
+      return {
+        ...current,
+        townProgress: nextProgress,
+        message: `Sanctuary blessing rises to tier ${nextLevel}. ${describeBlessingLevel(nextLevel)}`
+      };
+    });
+  }, [updateState]);
 
   const buyFromMarket = React.useCallback(
     (itemKey: MarketItemKey) => {
@@ -516,6 +1061,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       heroClone.xp += xpEarned;
       heroClone.coins += coinsEarned;
       const { hero: leveledHero, levelMessages } = applyLevelUps(heroClone);
+      const leveledSnapshot: Hero = { ...leveledHero };
+      const { run: runAfter, hero: heroAfterRun } = applyRunBattleVictory(
+        current.run,
+        leveledSnapshot,
+        battle
+      );
       const loot = rollBattleLoot(battle.enemy.location);
       const rewardSummary: PostBattleRewards = {
         enemyName: battle.enemy.name,
@@ -530,41 +1081,51 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             coins: heroBefore.coins
           },
           after: {
-            level: leveledHero.level,
-            xp: leveledHero.xp,
-            coins: leveledHero.coins
+            level: heroAfterRun.level,
+            xp: heroAfterRun.xp,
+            coins: heroAfterRun.coins
           },
           levelUps: levelMessages
         }
       };
       return {
-        hero: leveledHero,
+        hero: heroAfterRun,
         location: current.location,
         view: 'post-battle',
         battle: null,
         message: null,
         marketInventory: current.marketInventory,
-        postBattleRewards: rewardSummary
+        postBattleRewards: rewardSummary,
+        run: runAfter,
+        townProgress: current.townProgress
       } satisfies GameState;
     },
     []
   );
 
-  const resolveDefeat = React.useCallback((hero: Hero) => {
-    const heroClone: Hero = { ...hero };
-    heroClone.currentHp = Math.max(1, Math.round(heroClone.maxHp * 0.3));
-    heroClone.energy = Math.max(0, heroClone.energy - 1);
-    heroClone.coins = Math.max(0, heroClone.coins - 6);
-    return {
-      hero: heroClone,
-      location: 'village',
-      view: 'map',
-      battle: null,
-      message: 'Defeat stings. You limp back to the village to recover.',
-      marketInventory: generateMarketInventory(),
-      postBattleRewards: null
-    } satisfies GameState;
-  }, []);
+  const resolveDefeat = React.useCallback(
+    (current: GameState, hero: Hero) => {
+      const heroClone: Hero = { ...hero };
+      heroClone.currentHp = Math.max(1, Math.round(heroClone.maxHp * 0.3));
+      heroClone.energy = Math.max(0, heroClone.energy - 1);
+      heroClone.coins = Math.max(0, heroClone.coins - 6);
+      if (current.run) {
+        return concludeRun(current, heroClone, current.run, 'failure');
+      }
+      return {
+        ...current,
+        hero: heroClone,
+        location: 'village',
+        view: 'map',
+        battle: null,
+        message: 'Defeat stings. You limp back to the village to recover.',
+        marketInventory: generateMarketInventory(),
+        postBattleRewards: null,
+        run: null
+      } satisfies GameState;
+    },
+    [concludeRun]
+  );
 
   const queueEnemyTurn = React.useCallback(() => {
     setTimeout(() => {
@@ -581,7 +1142,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           currentHp: enemyTurn.heroHp
         };
         if (enemyTurn.heroHp <= 0) {
-          return resolveDefeat(heroAfterEnemy);
+          return resolveDefeat(latest, heroAfterEnemy);
         }
         if (enemyTurn.battle.enemyHp <= 0) {
           return resolveVictory(latest, heroAfterEnemy, enemyTurn.battle);
@@ -633,7 +1194,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const retreat = React.useCallback(() => {
     updateState((current) => {
-      if (!current.hero || !current.battle) {
+      if (!current.hero) {
+        return current;
+      }
+      if (!current.battle) {
+        if (current.run) {
+          return concludeRun(current, current.hero, current.run, 'retreat');
+        }
         return current;
       }
       const heroAfterRetreat: Hero = {
@@ -641,20 +1208,24 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         currentHp: Math.max(1, current.battle.heroHp),
         energy: Math.max(0, current.hero.energy - 1)
       };
+      if (current.run) {
+        return concludeRun(current, heroAfterRetreat, current.run, 'failure');
+      }
       return {
+        ...current,
         hero: heroAfterRetreat,
         location: 'village',
         view: 'map',
         battle: null,
         message: 'You retreat beneath the moon, vowing to return stronger.',
-        marketInventory: current.marketInventory,
-        postBattleRewards: null
+        postBattleRewards: null,
+        run: null
       } satisfies GameState;
     });
-  }, [updateState]);
+  }, [concludeRun, updateState]);
 
   const resetGame = React.useCallback(() => {
-    updateState(() => ({ ...defaultState }));
+    updateState((current) => ({ ...defaultState, townProgress: current.townProgress }));
   }, [updateState]);
 
   const heroMoves = React.useCallback(() => {
@@ -671,18 +1242,53 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const acknowledgeRewards = React.useCallback(() => {
     updateState((current) => {
       if (!current.postBattleRewards) {
+        if (current.run?.awaitingNextStep) {
+          const runMessageBase =
+            current.run.pendingMessages.length > 0
+              ? current.run.pendingMessages.join(' ')
+              : 'The forest shifts around you.';
+          const followUp = current.run.completed
+            ? 'Return to Silverfen to bank your triumph.'
+            : `New paths await at depth ${current.run.depth}.`;
+          return {
+            ...current,
+            view: 'run',
+            battle: null,
+            postBattleRewards: null,
+            message: `${runMessageBase} ${followUp}`.trim(),
+            run: { ...current.run, awaitingNextStep: false, pendingMessages: [] }
+          } satisfies GameState;
+        }
         return { ...current, view: 'map', battle: null };
       }
       const summary = current.postBattleRewards;
       const baseMessage = `Victory over ${summary.enemyName}! +${summary.xpEarned} XP, +${summary.coinsEarned} coins.`;
       const levelMessage = summary.heroProgress.levelUps.join(' ');
+      const runAwaiting = current.run?.awaitingNextStep ?? false;
+      if (runAwaiting && current.run) {
+        const runMessageBase =
+          current.run.pendingMessages.length > 0
+            ? current.run.pendingMessages.join(' ')
+            : 'The forest shifts around you.';
+        const followUp = current.run.completed
+          ? 'Return to Silverfen to bank your triumph.'
+          : `New paths await at depth ${current.run.depth}.`;
+        return {
+          ...current,
+          view: 'run',
+          battle: null,
+          postBattleRewards: null,
+          message: `${baseMessage} ${runMessageBase} ${followUp}`.trim(),
+          run: { ...current.run, awaitingNextStep: false, pendingMessages: [] }
+        } satisfies GameState;
+      }
       return {
         ...current,
         view: 'map',
         battle: null,
         postBattleRewards: null,
         message: levelMessage ? `${baseMessage} ${levelMessage}` : baseMessage
-      };
+      } satisfies GameState;
     });
   }, [updateState]);
 
@@ -698,12 +1304,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       visitMarket,
       buyFromMarket,
       startBattle,
+      beginForestRun,
+      chooseRunOption,
+      abandonRun,
       performHeroMove,
       retreat,
       resetGame,
       heroMoves,
       dismissMessage,
-      acknowledgeRewards
+      acknowledgeRewards,
+      purchaseTownBlessing
     }),
     [
       state,
@@ -716,12 +1326,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       visitMarket,
       buyFromMarket,
       startBattle,
+      beginForestRun,
+      chooseRunOption,
+      abandonRun,
       performHeroMove,
       retreat,
       resetGame,
       heroMoves,
       dismissMessage,
-      acknowledgeRewards
+      acknowledgeRewards,
+      purchaseTownBlessing
     ]
   );
 
