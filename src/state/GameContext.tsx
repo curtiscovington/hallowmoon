@@ -7,6 +7,7 @@ import {
   GameState,
   Resources,
   Slot,
+  SlotRepair,
   SlotType
 } from './types';
 
@@ -41,6 +42,9 @@ interface SlotTemplate {
   traits: string[];
   accepted: Slot['accepted'];
   upgradeCost: number;
+  unlocked?: boolean;
+  state?: Slot['state'];
+  repair?: { targetKey: string; time: number };
 }
 
 const HERO_TEMPLATE: CardTemplate = {
@@ -99,6 +103,16 @@ const OPPORTUNITY_TEMPLATES: CardTemplate[] = [
 ];
 
 const SLOT_TEMPLATES: Record<string, SlotTemplate> = {
+  manor: {
+    key: 'the-manor',
+    name: 'The Manor',
+    type: 'manor',
+    description:
+      'Dusty corridors wind through a neglected estate. Explore to reveal the rooms hidden within.',
+    traits: ['domain'],
+    accepted: 'persona-only',
+    upgradeCost: 0
+  },
   hearth: {
     key: 'veiled-sanctum',
     name: 'Veiled Sanctum',
@@ -148,6 +162,81 @@ const SLOT_TEMPLATES: Record<string, SlotTemplate> = {
     traits: ['expedition'],
     accepted: 'persona-only',
     upgradeCost: 6
+  },
+  bedroom: {
+    key: 'moonlit-bedroom',
+    name: 'Moonlit Bedroom',
+    type: 'bedroom',
+    description:
+      'A restful chamber washed in pale glow. Let a persona sleep here to court lucid dreams.',
+    traits: ['haven', 'dream'],
+    accepted: 'persona-only',
+    upgradeCost: 2
+  },
+  'damaged-sanctum': {
+    key: 'ruined-sanctum',
+    name: 'Ruined Sanctum',
+    type: 'manor',
+    description:
+      'Broken mirrors and dust-clogged braziers mute the sanctum. A persona could clear it in two cycles.',
+    traits: ['damaged', 'haven'],
+    accepted: 'persona-only',
+    upgradeCost: 0,
+    unlocked: true,
+    state: 'damaged',
+    repair: { targetKey: 'hearth', time: 2 }
+  },
+  'damaged-scriptorium': {
+    key: 'ruined-scriptorium',
+    name: 'Ruined Scriptorium',
+    type: 'manor',
+    description:
+      'Tumbled shelves choke the worktables. Clearing the debris will reopen the scriptorium.',
+    traits: ['damaged', 'job'],
+    accepted: 'persona-only',
+    upgradeCost: 0,
+    unlocked: true,
+    state: 'damaged',
+    repair: { targetKey: 'work', time: 3 }
+  },
+  'damaged-archive': {
+    key: 'ruined-archive',
+    name: 'Ruined Archive',
+    type: 'manor',
+    description:
+      'Boxes of mildew and collapsed shelves hide the Night Archive. Patient sorting can restore it.',
+    traits: ['damaged', 'study'],
+    accepted: 'any',
+    upgradeCost: 0,
+    unlocked: true,
+    state: 'damaged',
+    repair: { targetKey: 'study', time: 2 }
+  },
+  'damaged-circle': {
+    key: 'ruined-circle',
+    name: 'Ruined Circle',
+    type: 'manor',
+    description:
+      'The ritual chamber is cracked and waterlogged. Restoring the sigils will take devoted focus.',
+    traits: ['damaged', 'ritual'],
+    accepted: 'persona-only',
+    upgradeCost: 0,
+    unlocked: true,
+    state: 'damaged',
+    repair: { targetKey: 'ritual', time: 3 }
+  },
+  'damaged-bedroom': {
+    key: 'ruined-bedroom',
+    name: 'Ruined Bedroom',
+    type: 'manor',
+    description:
+      'Mattresses are mouldering and windows broken. Two cycles of care will make it fit for dreaming.',
+    traits: ['damaged', 'dream'],
+    accepted: 'persona-only',
+    upgradeCost: 0,
+    unlocked: true,
+    state: 'damaged',
+    repair: { targetKey: 'bedroom', time: 2 }
   }
 };
 
@@ -170,9 +259,17 @@ function instantiateCard(template: CardTemplate): CardInstance {
   };
 }
 
-function instantiateSlot(template: SlotTemplate): Slot {
+function instantiateSlot(template: SlotTemplate, id?: string): Slot {
+  const repair: SlotRepair | null = template.repair
+    ? {
+        targetKey: template.repair.targetKey,
+        remaining: template.repair.time,
+        total: template.repair.time
+      }
+    : null;
+
   return {
-    id: `slot-${template.key}`,
+    id: id ?? `slot-${template.key}`,
     key: template.key,
     name: template.name,
     type: template.type,
@@ -182,8 +279,70 @@ function instantiateSlot(template: SlotTemplate): Slot {
     traits: [...template.traits],
     accepted: template.accepted,
     occupantId: null,
-    unlocked: true
+    assistantId: null,
+    unlocked: template.unlocked ?? true,
+    state: template.state ?? 'active',
+    repair,
+    repairStarted: false
   };
+}
+
+const MANOR_ROOM_TEMPLATE_KEYS = [
+  'damaged-sanctum',
+  'damaged-scriptorium',
+  'damaged-archive',
+  'damaged-circle',
+  'damaged-bedroom'
+] as const;
+
+type ManorRoomTemplateKey = (typeof MANOR_ROOM_TEMPLATE_KEYS)[number];
+
+const DREAM_TITLES = [
+  'Silver Staircases',
+  'Echoing Halls',
+  'Frosted Lanterns',
+  'Lunar Choirs',
+  'Velvet Storms',
+  'Shattered Constellations'
+] as const;
+
+function randomFrom<T>(options: readonly T[]): T {
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+function isDreamCard(card: CardInstance | undefined): card is CardInstance {
+  return Boolean(card && card.traits.includes('dream'));
+}
+
+function extractDreamTitle(dream: CardInstance): string {
+  return dream.name.replace(/^Fleeting Dream:\s*/, '');
+}
+
+function createDreamCard(): CardInstance {
+  const title = randomFrom(DREAM_TITLES);
+  const template: CardTemplate = {
+    key: 'fleeting-dream',
+    name: `Fleeting Dream: ${title}`,
+    type: 'inspiration',
+    description: `A fleeting vision of ${title.toLowerCase()}. Document it before it fades.`,
+    traits: ['dream', 'fleeting'],
+    permanent: false,
+    lifetime: 3
+  };
+  return instantiateCard(template);
+}
+
+function createJournalFromDream(dream: CardInstance, persona: CardInstance): CardInstance {
+  const recordedTitle = extractDreamTitle(dream) || dream.name;
+  const template: CardTemplate = {
+    key: 'private-journal',
+    name: `Private Journal: ${recordedTitle}`,
+    type: 'inspiration',
+    description: `${persona.name} documents the dream of ${recordedTitle}, preserving its whispers for later study.`,
+    traits: ['journal', 'dream-record', `dream:${recordedTitle}`],
+    permanent: false
+  };
+  return instantiateCard(template);
 }
 
 function baseResources(): Resources {
@@ -194,15 +353,9 @@ function initialState(): GameState {
   const hero = instantiateCard(HERO_TEMPLATE);
   const whisper = instantiateCard(OPPORTUNITY_TEMPLATES[0]);
   const slots: Record<string, Slot> = {};
-  const hearthSlot = instantiateSlot(SLOT_TEMPLATES.hearth);
-  const workSlot = instantiateSlot(SLOT_TEMPLATES.work);
-  const studySlot = instantiateSlot(SLOT_TEMPLATES.study);
-  const ritualSlot = instantiateSlot(SLOT_TEMPLATES.ritual);
+  const manorSlot = instantiateSlot(SLOT_TEMPLATES.manor);
 
-  slots[hearthSlot.id] = hearthSlot;
-  slots[workSlot.id] = workSlot;
-  slots[studySlot.id] = studySlot;
-  slots[ritualSlot.id] = ritualSlot;
+  slots[manorSlot.id] = manorSlot;
 
   return {
     cycle: 1,
@@ -215,7 +368,7 @@ function initialState(): GameState {
     slots,
     resources: baseResources(),
     log: [
-      'You awaken within the Veiled Sanctum. The cult expects a new tale of moonlit ambition.'
+      'You arrive at the shuttered manor. Its rooms slumber beneath dust and locked memories.'
     ],
     discoveries: []
   };
@@ -416,6 +569,128 @@ function workJob(state: GameState, slot: Slot, log: string[]): { state: GameStat
   };
 }
 
+function exploreManor(state: GameState, slot: Slot, log: string[]): { state: GameState; log: string[] } {
+  if (!slot.occupantId) {
+    return { state, log: appendLog(log, 'Send a persona into the manor before attempting to explore it.') };
+  }
+
+  const persona = state.cards[slot.occupantId];
+  if (!persona || persona.type !== 'persona') {
+    return { state, log: appendLog(log, 'Only a living persona can unveil the manor’s halls.') };
+  }
+
+  const missingKeys: ManorRoomTemplateKey[] = MANOR_ROOM_TEMPLATE_KEYS.filter((templateKey) => {
+    const template = SLOT_TEMPLATES[templateKey];
+    const restoredKey = template.repair ? SLOT_TEMPLATES[template.repair.targetKey].key : null;
+    return !Object.values(state.slots).some(
+      (existing) => existing.key === template.key || (restoredKey ? existing.key === restoredKey : false)
+    );
+  });
+
+  if (missingKeys.length === 0) {
+    return {
+      state,
+      log: appendLog(log, 'The manor is quiet for now; every discovered room awaits restoration.')
+    };
+  }
+
+  let updatedSlots = { ...state.slots };
+  const revealedRooms: string[] = [];
+
+  for (const key of missingKeys) {
+    const template = SLOT_TEMPLATES[key];
+    const newRoom = instantiateSlot(template);
+    updatedSlots[newRoom.id] = newRoom;
+    revealedRooms.push(newRoom.name);
+  }
+
+  const nextState: GameState = {
+    ...state,
+    slots: updatedSlots
+  };
+
+  const roomsFragment = revealedRooms.join(', ');
+  const nextLog = appendLog(
+    log,
+    `${persona.name} charts the manor’s halls, revealing ${roomsFragment}.`
+  );
+
+  return { state: nextState, log: nextLog };
+}
+
+function repairManorRoom(state: GameState, slot: Slot, log: string[]): { state: GameState; log: string[] } {
+  if (!slot.repair) {
+    return { state, log };
+  }
+
+  if (!slot.occupantId) {
+    return { state, log: appendLog(log, 'Assign a persona to clear the debris from this room.') };
+  }
+
+  const persona = state.cards[slot.occupantId];
+  if (!persona || persona.type !== 'persona') {
+    return { state, log: appendLog(log, 'A persona must brave the dust and cobwebs to restore the room.') };
+  }
+
+  const cyclesRemaining = slot.repair.remaining;
+  const message = slot.repairStarted
+    ? `${persona.name} continues restoring ${slot.name}. ${cyclesRemaining} cycle${
+        cyclesRemaining === 1 ? '' : 's'
+      } remain.`
+    : `${persona.name} begins restoring ${slot.name}. ${cyclesRemaining} cycle${
+        cyclesRemaining === 1 ? '' : 's'
+      } remain.`;
+
+  if (slot.repairStarted) {
+    return { state, log: appendLog(log, message) };
+  }
+
+  const updatedSlots = {
+    ...state.slots,
+    [slot.id]: {
+      ...slot,
+      repairStarted: true
+    }
+  };
+
+  return {
+    state: {
+      ...state,
+      slots: updatedSlots
+    },
+    log: appendLog(log, message)
+  };
+}
+
+function bedroomSlot(state: GameState, slot: Slot, log: string[]): { state: GameState; log: string[] } {
+  if (!slot.occupantId) {
+    return { state, log: appendLog(log, 'Let a persona rest within the bedroom to invite a dream.') };
+  }
+
+  const persona = state.cards[slot.occupantId];
+  if (!persona || persona.type !== 'persona') {
+    return { state, log: appendLog(log, 'Only a persona may slumber deeply enough to dream here.') };
+  }
+
+  const dream = createDreamCard();
+
+  const nextState: GameState = {
+    ...state,
+    cards: {
+      ...state.cards,
+      [dream.id]: dream
+    },
+    hand: addToHand(state.hand, dream.id, false)
+  };
+
+  const nextLog = appendLog(
+    log,
+    `${persona.name} slumbers in ${slot.name}, awakening with ${dream.name}.`
+  );
+
+  return { state: nextState, log: nextLog };
+}
+
 function studySlot(state: GameState, slot: Slot, log: string[]): { state: GameState; log: string[] } {
   if (!slot.occupantId) {
     return { state, log: appendLog(log, 'Place a card upon the Night Archive to study it.') };
@@ -424,6 +699,42 @@ function studySlot(state: GameState, slot: Slot, log: string[]): { state: GameSt
   const card = state.cards[slot.occupantId];
   if (!card) {
     return { state, log };
+  }
+
+  const assistant = slot.assistantId ? state.cards[slot.assistantId] ?? null : null;
+
+  if (isDreamCard(card) && assistant && assistant.type === 'persona') {
+    const journal = createJournalFromDream(card, assistant);
+    const updatedCards = { ...state.cards };
+    delete updatedCards[card.id];
+    const journalCard = { ...journal };
+    updatedCards[journalCard.id] = journalCard;
+
+    const updatedHand = addToHand(removeFromHand(state.hand, card.id), journalCard.id, false);
+
+    const updatedSlots = {
+      ...state.slots,
+      [slot.id]: {
+        ...slot,
+        occupantId: assistant.id,
+        assistantId: null
+      }
+    };
+
+    const nextLog = appendLog(
+      log,
+      `${assistant.name} records ${card.name}, preserving it as ${journalCard.name}.`
+    );
+
+    return {
+      state: {
+        ...state,
+        cards: updatedCards,
+        slots: updatedSlots,
+        hand: updatedHand
+      },
+      log: nextLog
+    };
   }
 
   if (card.type === 'persona') {
@@ -463,7 +774,8 @@ function studySlot(state: GameState, slot: Slot, log: string[]): { state: GameSt
     ...nextState.slots,
     [slot.id]: {
       ...slot,
-      occupantId: null
+      occupantId: null,
+      assistantId: null
     }
   };
 
@@ -591,6 +903,13 @@ function activateSlot(state: GameState, slotId: string): { state: GameState; log
       return ritualSlot(state, slot, log);
     case 'expedition':
       return expeditionSlot(state, slot, log);
+    case 'manor':
+      if (slot.state === 'damaged' && slot.repair) {
+        return repairManorRoom(state, slot, log);
+      }
+      return exploreManor(state, slot, log);
+    case 'bedroom':
+      return bedroomSlot(state, slot, log);
     default:
       return { state, log };
   }
@@ -629,26 +948,124 @@ function gameReducer(state: GameState, action: Action): GameState {
       } else if (card.location.area === 'slot') {
         const previousSlot = updatedSlots[card.location.slotId];
         if (previousSlot) {
-          updatedSlots[previousSlot.id] = {
-            ...previousSlot,
-            occupantId: null
-          };
+          if (previousSlot.occupantId === card.id) {
+            const promotedOccupant =
+              previousSlot.assistantId && previousSlot.assistantId !== card.id
+                ? previousSlot.assistantId
+                : null;
+            updatedSlots[previousSlot.id] = {
+              ...previousSlot,
+              occupantId: promotedOccupant,
+              assistantId:
+                promotedOccupant && previousSlot.assistantId === promotedOccupant
+                  ? null
+                  : previousSlot.assistantId === card.id
+                  ? null
+                  : previousSlot.assistantId
+            };
+          } else if (previousSlot.assistantId === card.id) {
+            updatedSlots[previousSlot.id] = {
+              ...previousSlot,
+              assistantId: null
+            };
+          }
         }
       }
 
-      if (slot.occupantId && slot.occupantId !== card.id) {
-        const displaced = updatedCards[slot.occupantId];
-        if (displaced) {
-          updatedCards = {
-            ...updatedCards,
-            [displaced.id]: {
-              ...displaced,
-              location: { area: 'hand' }
-            },
-            [card.id]: { ...card, location: { area: 'slot', slotId: slot.id } }
+      const targetSlot = updatedSlots[slot.id];
+      const currentOccupantId = targetSlot.occupantId;
+      const currentAssistantId = targetSlot.assistantId;
+      const currentOccupant = currentOccupantId ? updatedCards[currentOccupantId] : undefined;
+      const currentAssistant = currentAssistantId ? updatedCards[currentAssistantId] : undefined;
+
+      if (
+        slot.type === 'study' &&
+        currentOccupant &&
+        currentOccupant.type === 'persona' &&
+        isDreamCard(card) &&
+        !currentAssistantId
+      ) {
+        updatedCards = {
+          ...updatedCards,
+          [currentOccupant.id]: { ...currentOccupant, location: { area: 'slot', slotId: slot.id } },
+          [card.id]: { ...card, location: { area: 'slot', slotId: slot.id } }
+        };
+        updatedSlots[slot.id] = {
+          ...targetSlot,
+          occupantId: card.id,
+          assistantId: currentOccupant.id
+        };
+        updatedLog = appendLog(
+          updatedLog,
+          `${card.name} is entrusted to ${currentOccupant.name} for study.`
+        );
+        return {
+          ...state,
+          cards: updatedCards,
+          slots: updatedSlots,
+          hand: updatedHand,
+          log: updatedLog
+        };
+      }
+
+      if (
+        slot.type === 'study' &&
+        currentOccupant &&
+        isDreamCard(currentOccupant) &&
+        card.type === 'persona' &&
+        (!currentAssistant || currentAssistant.id === card.id)
+      ) {
+        updatedCards = {
+          ...updatedCards,
+          [card.id]: { ...card, location: { area: 'slot', slotId: slot.id } }
+        };
+        updatedSlots[slot.id] = {
+          ...targetSlot,
+          assistantId: card.id
+        };
+        updatedLog = appendLog(
+          updatedLog,
+          `${card.name} joins ${currentOccupant.name} to interpret the dream.`
+        );
+        return {
+          ...state,
+          cards: updatedCards,
+          slots: updatedSlots,
+          hand: updatedHand,
+          log: updatedLog
+        };
+      }
+
+      if (currentOccupantId && currentOccupantId !== card.id) {
+        const displacedUpdates: Record<string, CardInstance> = {};
+
+        if (currentOccupant) {
+          displacedUpdates[currentOccupant.id] = {
+            ...currentOccupant,
+            location: { area: 'hand' }
           };
-          updatedHand = addToHand(updatedHand, displaced.id);
+          updatedHand = addToHand(updatedHand, currentOccupant.id);
         }
+
+        if (currentAssistantId && currentAssistant && currentAssistant.id !== card.id) {
+          displacedUpdates[currentAssistant.id] = {
+            ...currentAssistant,
+            location: { area: 'hand' }
+          };
+          updatedHand = addToHand(updatedHand, currentAssistant.id);
+        }
+
+        updatedCards = {
+          ...updatedCards,
+          ...displacedUpdates,
+          [card.id]: { ...card, location: { area: 'slot', slotId: slot.id } }
+        };
+
+        updatedSlots[slot.id] = {
+          ...targetSlot,
+          occupantId: card.id,
+          assistantId: null
+        };
       } else {
         updatedCards = {
           ...updatedCards,
@@ -657,12 +1074,13 @@ function gameReducer(state: GameState, action: Action): GameState {
             location: { area: 'slot', slotId: slot.id }
           }
         };
-      }
 
-      updatedSlots[slot.id] = {
-        ...slot,
-        occupantId: card.id
-      };
+        updatedSlots[slot.id] = {
+          ...targetSlot,
+          occupantId: card.id,
+          assistantId: targetSlot.assistantId && targetSlot.assistantId !== card.id ? targetSlot.assistantId : null
+        };
+      }
 
       updatedLog = appendLog(updatedLog, `${card.name} settles into ${slot.name}.`);
 
@@ -684,10 +1102,33 @@ function gameReducer(state: GameState, action: Action): GameState {
       if (card.location.area === 'slot') {
         const slot = state.slots[card.location.slotId];
         if (slot) {
-          updatedSlots = {
-            ...state.slots,
-            [slot.id]: { ...slot, occupantId: null }
-          };
+          let nextSlot: Slot = slot;
+          if (slot.occupantId === card.id) {
+            const promotedOccupant =
+              slot.assistantId && slot.assistantId !== card.id ? slot.assistantId : null;
+            nextSlot = {
+              ...slot,
+              occupantId: promotedOccupant,
+              assistantId:
+                promotedOccupant && slot.assistantId === promotedOccupant
+                  ? null
+                  : slot.assistantId === card.id
+                  ? null
+                  : slot.assistantId
+            };
+          } else if (slot.assistantId === card.id) {
+            nextSlot = {
+              ...slot,
+              assistantId: null
+            };
+          }
+
+          if (nextSlot !== slot) {
+            updatedSlots = {
+              ...state.slots,
+              [slot.id]: nextSlot
+            };
+          }
         }
       }
 
@@ -752,9 +1193,28 @@ function gameReducer(state: GameState, action: Action): GameState {
           } else if (card.location.area === 'slot') {
             const slot = updatedSlots[card.location.slotId];
             if (slot && slot.occupantId === card.id) {
+              const promotedOccupant =
+                slot.assistantId && slot.assistantId !== card.id ? slot.assistantId : null;
               updatedSlots = {
                 ...updatedSlots,
-                [slot.id]: { ...slot, occupantId: null }
+                [slot.id]: {
+                  ...slot,
+                  occupantId: promotedOccupant,
+                  assistantId:
+                    promotedOccupant && slot.assistantId === promotedOccupant
+                      ? null
+                      : slot.assistantId === card.id
+                      ? null
+                      : slot.assistantId
+                }
+              };
+            } else if (slot && slot.assistantId === card.id) {
+              updatedSlots = {
+                ...updatedSlots,
+                [slot.id]: {
+                  ...slot,
+                  assistantId: null
+                }
               };
             }
           }
@@ -777,6 +1237,63 @@ function gameReducer(state: GameState, action: Action): GameState {
         cards: updatedCards,
         slots: updatedSlots,
         hand: updatedHand,
+        log: updatedLog
+      };
+
+      for (const slot of Object.values(updatedSlots)) {
+        if (
+          slot.state === 'damaged' &&
+          slot.repair &&
+          slot.repairStarted &&
+          slot.occupantId
+        ) {
+          const occupant = updatedCards[slot.occupantId];
+          if (!occupant || occupant.type !== 'persona') {
+            continue;
+          }
+
+          const remaining = slot.repair.remaining - 1;
+          if (remaining <= 0) {
+            const targetTemplate = SLOT_TEMPLATES[slot.repair.targetKey];
+            if (targetTemplate) {
+              const restoredSlot = instantiateSlot(targetTemplate, slot.id);
+              updatedSlots = {
+                ...updatedSlots,
+                [slot.id]: {
+                  ...restoredSlot,
+                  occupantId: slot.occupantId,
+                  assistantId: null
+                }
+              };
+              updatedLog = appendLog(
+                updatedLog,
+                `${occupant.name} restores ${restoredSlot.name}, ready for use.`
+              );
+            }
+          } else {
+            updatedSlots = {
+              ...updatedSlots,
+              [slot.id]: {
+                ...slot,
+                repair: {
+                  ...slot.repair,
+                  remaining
+                }
+              }
+            };
+            updatedLog = appendLog(
+              updatedLog,
+              `${occupant.name} makes progress restoring ${slot.name}. ${remaining} cycle${
+                remaining === 1 ? '' : 's'
+              } remain.`
+            );
+          }
+        }
+      }
+
+      nextState = {
+        ...nextState,
+        slots: updatedSlots,
         log: updatedLog
       };
 

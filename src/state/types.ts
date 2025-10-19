@@ -37,7 +37,15 @@ export interface CardInstance {
   location: CardLocation;
 }
 
-export type SlotType = 'hearth' | 'work' | 'study' | 'ritual' | 'expedition';
+export type SlotType = 'hearth' | 'work' | 'study' | 'ritual' | 'expedition' | 'manor' | 'bedroom';
+
+export type SlotState = 'active' | 'damaged';
+
+export interface SlotRepair {
+  targetKey: string;
+  remaining: number;
+  total: number;
+}
 
 export type SlotAcceptance = 'persona-only' | 'non-persona' | 'any';
 
@@ -52,7 +60,11 @@ export interface Slot {
   traits: string[];
   accepted: SlotAcceptance;
   occupantId: string | null;
+  assistantId: string | null;
   unlocked: boolean;
+  state: SlotState;
+  repair: SlotRepair | null;
+  repairStarted: boolean;
 }
 
 export interface Discovery {

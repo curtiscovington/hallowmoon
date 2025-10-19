@@ -218,12 +218,15 @@ const SLOT_TYPE_INFO: Record<Slot['type'], { label: string; icon: string }> = {
   work: { label: 'Work', icon: '🛠' },
   study: { label: 'Study', icon: '📚' },
   ritual: { label: 'Ritual', icon: '🔮' },
-  expedition: { label: 'Expedition', icon: '🧭' }
+  expedition: { label: 'Expedition', icon: '🧭' },
+  manor: { label: 'Manor', icon: '🏚️' },
+  bedroom: { label: 'Bedroom', icon: '🛏️' }
 };
 
 function SlotView({
   slot,
   occupant,
+  assistant,
   isHeroInSlot,
   onClick,
   onActivate,
@@ -238,6 +241,7 @@ function SlotView({
 }: {
   slot: Slot;
   occupant: CardInstance | null;
+  assistant: CardInstance | null;
   isHeroInSlot: boolean;
   onClick: (slotId: string) => void;
   onActivate: (slotId: string) => void;
@@ -257,12 +261,19 @@ function SlotView({
   const detailsId = `slot-details-${slot.id}`;
   const slotTypeInfo = SLOT_TYPE_INFO[slot.type];
   const occupancyLabel = occupant
-    ? occupant.name
+    ? assistant
+      ? `${occupant.name} · with ${assistant.name}`
+      : occupant.name
     : slot.unlocked
     ? 'Open for assignment'
     : 'Locked discovery';
   const acceptanceLabel = describeSlotAcceptance(slot.accepted);
-  const occupantTraits = occupant && occupant.traits.length > 0 ? occupant.traits.join(' · ') : null;
+  const occupantTraitSources = [
+    ...(occupant ? occupant.traits : []),
+    ...(assistant ? assistant.traits : [])
+  ];
+  const occupantTraits =
+    occupantTraitSources.length > 0 ? Array.from(new Set(occupantTraitSources)).join(' · ') : null;
   const slotClasses = ['slot-card'];
   if (!slot.unlocked) {
     slotClasses.push('slot-card--locked');
@@ -280,6 +291,28 @@ function SlotView({
   }
 
   const occupantExpiry = occupant ? describeCardExpiry(occupant, timing) : null;
+  const assistantExpiry = assistant ? describeCardExpiry(assistant, timing) : null;
+  const repairNote =
+    slot.state === 'damaged' && slot.repair
+      ? slot.repairStarted
+        ? `${slot.repair.remaining} cycle${slot.repair.remaining === 1 ? '' : 's'} remain before restoration.`
+        : 'In disrepair — activate with a persona to begin restoration.'
+      : null;
+
+  function getActivateLabel(): string {
+    switch (slot.type) {
+      case 'work':
+        return 'Work';
+      case 'hearth':
+        return 'Rest';
+      case 'manor':
+        return slot.state === 'damaged' ? 'Clear' : 'Explore';
+      case 'bedroom':
+        return 'Slumber';
+      default:
+        return 'Activate';
+    }
+  }
 
   function acceptsCard(event: DragEvent<HTMLElement>) {
     return event.dataTransfer?.types.includes(CARD_DRAG_TYPE) ?? false;
@@ -436,19 +469,24 @@ function SlotView({
             onClick={() => onActivate(slot.id)}
             disabled={!slot.unlocked}
           >
-            {slot.type === 'work' ? 'Work' : slot.type === 'hearth' ? 'Rest' : 'Activate'}
+            {getActivateLabel()}
           </button>
           <button
             className="slot-card__action"
             type="button"
             onClick={() => onUpgrade(slot.id)}
-            disabled={!slot.unlocked}
+            disabled={!slot.unlocked || slot.state === 'damaged' || slot.upgradeCost === 0}
           >
             Upgrade ({upgradeCost} ✦)
           </button>
+          {assistant ? (
+            <button className="slot-card__action" type="button" onClick={() => onRecall(assistant.id)}>
+              {`Recall ${assistant.name}`}
+            </button>
+          ) : null}
           {occupant ? (
             <button className="slot-card__action" type="button" onClick={() => onRecall(occupant.id)}>
-              Recall
+              {`Recall ${occupant.name}`}
             </button>
           ) : null}
         </div>
@@ -460,6 +498,15 @@ function SlotView({
             <span className="slot-card__note">
               {occupantExpiry.cycles} cycle{occupantExpiry.cycles === 1 ? '' : 's'} remain · ≈ {occupantExpiry.durationLabel}
             </span>
+          ) : null}
+          {assistantExpiry ? (
+            <span className="slot-card__note">
+              {(assistant?.name ?? 'Assistant')} has {assistantExpiry.cycles} cycle{assistantExpiry.cycles === 1 ? '' : 's'} remaining · ≈ {assistantExpiry.durationLabel}
+            </span>
+          ) : null}
+          {repairNote ? <span className="slot-card__note">{repairNote}</span> : null}
+          {assistant && !assistantExpiry ? (
+            <span className="slot-card__note">Assistant: {assistant.name}</span>
           ) : null}
           {slot.type === 'work' && !isHeroInSlot ? (
             <span className="slot-card__note">Send your persona to work shifts.</span>
@@ -720,12 +767,17 @@ export default function App() {
         <section className="slots-grid" aria-label="Available slots">
           {slots.map((slot) => {
             const occupant = slot.occupantId ? state.cards[slot.occupantId] ?? null : null;
-            const isHeroInSlot = occupant ? occupant.id === state.heroCardId : false;
+            const assistant = slot.assistantId ? state.cards[slot.assistantId] ?? null : null;
+            const isHeroInSlot = Boolean(
+              (occupant && occupant.id === state.heroCardId) ||
+                (assistant && assistant.id === state.heroCardId)
+            );
             return (
               <SlotView
                 key={slot.id}
                 slot={slot}
                 occupant={occupant}
+                assistant={assistant}
                 isHeroInSlot={isHeroInSlot}
                 onClick={handleSlotClick}
                 onActivate={activateSlot}
