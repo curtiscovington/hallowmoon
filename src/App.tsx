@@ -1,4 +1,4 @@
-import { DragEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { DragEvent, useEffect, useId, useMemo, useState } from 'react';
 import { useGame } from './state/GameContext';
 import { CardInstance, Slot } from './state/types';
 
@@ -13,6 +13,7 @@ type SpeedOption = (typeof SPEED_OPTIONS)[number];
 interface CardTimingContext {
   cycleDurationMs: number;
   timeToNextCycleMs: number;
+  timeScale: number;
 }
 
 function useMediaQuery(query: string): boolean {
@@ -268,6 +269,7 @@ function SlotView({
   const occupantTraits =
     occupantTraitSources.length > 0 ? Array.from(new Set(occupantTraitSources)).join(' · ') : null;
   const lockRemainingMs = slot.lockedUntil ? Math.max(0, slot.lockedUntil - Date.now()) : 0;
+  const displayLockRemainingMs = Math.max(0, Math.round(lockRemainingMs * timing.timeScale));
   const isSlotLocked = Boolean(slot.lockedUntil && lockRemainingMs > 0);
   const isSlotInteractive = slot.unlocked && !isSlotLocked;
   const slotClasses = ['slot-card'];
@@ -294,10 +296,10 @@ function SlotView({
   const timerMessage = isSlotLocked
     ? isTimePaused
       ? 'Resolving · paused'
-      : `Resolving · ≈ ${formatDuration(lockRemainingMs)}`
+      : `Resolving · ≈ ${formatDuration(displayLockRemainingMs)}`
     : isTimePaused
     ? 'Time paused'
-    : `Next interval in ${formatDuration(timing.timeToNextCycleMs)}`;
+    : 'Ready';
 
   const occupantExpiry = occupant ? describeCardExpiry(occupant, timing) : null;
   const assistantExpiry = assistant ? describeCardExpiry(assistant, timing) : null;
@@ -522,8 +524,10 @@ function SlotView({
           {!occupant && !slot.unlocked ? (
             <span className="slot-card__note">Requires a discovery.</span>
           ) : null}
-          {isSlotLocked && lockRemainingMs > 0 ? (
-            <span className="slot-card__note">Resolving action · ≈ {formatDuration(lockRemainingMs)} remain</span>
+          {isSlotLocked && displayLockRemainingMs > 0 ? (
+            <span className="slot-card__note">
+              Resolving action · ≈ {formatDuration(displayLockRemainingMs)} remain
+            </span>
           ) : null}
           {occupantExpiry ? (
             <span className="slot-card__note">
@@ -563,9 +567,8 @@ export default function App() {
   const isDesktop = useMediaQuery('(min-width: 900px)');
   const [isPaused, setIsPaused] = useState(false);
   const [speed, setSpeed] = useState<SpeedOption>(1);
-  const cycleDurationMs = useMemo(() => Math.round(BASE_CYCLE_MS / speed), [speed]);
+  const cycleDurationMs = BASE_CYCLE_MS;
   const [timeToNextCycle, setTimeToNextCycle] = useState(cycleDurationMs);
-  const prevIntervalRef = useRef(cycleDurationMs);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
   const [isChronicleOpen, setIsChronicleOpen] = useState(false);
@@ -579,33 +582,18 @@ export default function App() {
 
     const intervalId = window.setInterval(() => {
       setTimeToNextCycle((prev) => {
-        const next = prev - TIMER_RESOLUTION_MS;
+        const decrement = TIMER_RESOLUTION_MS * speed;
+        const next = prev - decrement;
         if (next <= 0) {
           advanceTime();
           return cycleDurationMs;
         }
-        return next;
+        return Math.max(0, Math.min(cycleDurationMs, next));
       });
     }, TIMER_RESOLUTION_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [advanceTime, cycleDurationMs, isPaused]);
-
-  useEffect(() => {
-    const previous = prevIntervalRef.current;
-    if (previous !== cycleDurationMs) {
-      setTimeToNextCycle((prev) => {
-        if (previous <= 0) {
-          return cycleDurationMs;
-        }
-        const scaled = Math.round((prev / previous) * cycleDurationMs);
-        return Math.min(cycleDurationMs, Math.max(0, scaled));
-      });
-      prevIntervalRef.current = cycleDurationMs;
-      return;
-    }
-    prevIntervalRef.current = cycleDurationMs;
-  }, [cycleDurationMs]);
+  }, [advanceTime, cycleDurationMs, isPaused, speed]);
 
   useEffect(() => {
     setTimeScale(speed);
@@ -624,17 +612,9 @@ export default function App() {
   ]);
 
   const timingContext = useMemo<CardTimingContext>(
-    () => ({ cycleDurationMs, timeToNextCycleMs: timeToNextCycle }),
-    [cycleDurationMs, timeToNextCycle]
+    () => ({ cycleDurationMs, timeToNextCycleMs: timeToNextCycle, timeScale: state.timeScale }),
+    [cycleDurationMs, state.timeScale, timeToNextCycle]
   );
-
-  const headerTimerClasses = ['game-header__timer'];
-  if (isPaused) {
-    headerTimerClasses.push('game-header__timer--paused');
-  }
-
-  const nextIntervalLabel = isPaused ? 'Time paused' : `Next interval in ${formatDuration(timeToNextCycle)}`;
-  const cadenceLabel = `Cadence ≈ ${formatDuration(cycleDurationMs)}`;
 
   const selectedCard = selectedCardId ? state.cards[selectedCardId] ?? null : null;
 
@@ -739,15 +719,6 @@ export default function App() {
           </p>
         </div>
         <div className="game-header__status">
-          <div className="game-header__status-main">
-            <div className="game-header__cadence" aria-label="Current cadence">
-              <span className="game-header__cadence-label">Cadence</span>
-              <span className="game-header__cadence-value">{cadenceLabel}</span>
-            </div>
-            <div className={headerTimerClasses.join(' ')} role="timer">
-              {nextIntervalLabel}
-            </div>
-          </div>
           <div className="game-header__resources" aria-label="Resource overview">
             <div className="game-header__resources-scroll">
               {resourceTracks.map((track) => (
