@@ -44,6 +44,7 @@ body {
   max-width: 960px;
   margin: 0 auto;
   padding: clamp(1.2rem, 3vw, 2rem);
+  padding-top: calc(env(safe-area-inset-top) + clamp(4.5rem, 6vw, 5.5rem));
   gap: clamp(1rem, 2vw, 1.5rem);
   padding-bottom: clamp(4rem, 12vw, 5.5rem);
 }
@@ -918,19 +919,30 @@ body {
 }
 
 .game-controls {
-  display: flex;
-  justify-content: center;
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + clamp(0.75rem, 2vw, 1.4rem));
+  right: calc(env(safe-area-inset-right) + clamp(0.75rem, 2vw, 1.4rem));
+  display: inline-flex;
   align-items: center;
   gap: 0.65rem;
+  padding: 0.45rem 0.6rem;
+  padding-right: calc(0.6rem + env(safe-area-inset-right));
   background: rgba(34, 25, 62, 0.9);
   border: 1px solid rgba(130, 111, 236, 0.4);
   border-radius: 999px;
-  padding: 0.45rem 0.6rem;
-  width: min(960px, 100%);
-  margin: 0 auto;
   box-shadow: 0 12px 28px rgba(7, 5, 16, 0.45);
-  position: relative;
-  z-index: 60;
+  max-width: min(
+    22rem,
+    calc(100vw - clamp(1.6rem, 6vw, 3.8rem) - env(safe-area-inset-right))
+  );
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+  z-index: 120;
+}
+
+.game-controls::-webkit-scrollbar {
+  display: none;
 }
 
 .game-controls__button {
@@ -945,6 +957,7 @@ body {
   cursor: pointer;
   font-size: 1rem;
   transition: background 150ms ease, transform 150ms ease;
+  flex: 0 0 auto;
 }
 
 .game-controls__button:hover {
