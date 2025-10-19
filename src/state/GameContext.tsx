@@ -19,6 +19,7 @@ interface GameContextValue {
   upgradeSlot: (slotId: string) => void;
   advanceTime: () => void;
   getUpgradeCost: (slotId: string) => number;
+  setTimeScale: (scale: number) => void;
 }
 
 const GameContext = React.createContext<GameContextValue | null>(null);
@@ -296,7 +297,8 @@ function instantiateSlot(template: SlotTemplate, id?: string): Slot {
     state: template.state ?? 'active',
     repair,
     repairStarted: false,
-    lockedUntil: null
+    lockedUntil: null,
+    pendingAction: null
   };
 }
 
@@ -316,12 +318,18 @@ function formatDurationLabel(ms: number): string {
   return `${clamped}ms`;
 }
 
-function getSlotLockDurationMs(slot: Slot): number {
+function getSlotBaseLockDurationMs(slot: Slot): number {
   const base = SLOT_LOCK_DURATIONS[slot.type] ?? SLOT_LOCK_BASE_MS;
   if (slot.type === 'manor' && slot.state === 'damaged') {
     return base * 2;
   }
   return base;
+}
+
+function getScaledSlotLockDurationMs(slot: Slot, timeScale: number): number {
+  const baseDuration = getSlotBaseLockDurationMs(slot);
+  const scale = Math.max(timeScale, 0.25);
+  return Math.max(250, Math.round(baseDuration / scale));
 }
 
 const MANOR_ROOM_TEMPLATE_KEYS = [
@@ -407,7 +415,8 @@ function initialState(): GameState {
     log: [
       'You arrive at the shuttered manor. Its rooms slumber beneath dust and locked memories.'
     ],
-    discoveries: []
+    discoveries: [],
+    timeScale: 1
   };
 }
 
@@ -416,7 +425,8 @@ type Action =
   | { type: 'RECALL_CARD'; cardId: string }
   | { type: 'ACTIVATE_SLOT'; slotId: string }
   | { type: 'UPGRADE_SLOT'; slotId: string }
-  | { type: 'ADVANCE_TIME' };
+  | { type: 'ADVANCE_TIME' }
+  | { type: 'SET_TIME_SCALE'; scale: number };
 
 interface SlotActionResult {
   state: GameState;
@@ -650,7 +660,56 @@ function exploreManor(state: GameState, slot: Slot, log: string[]): SlotActionRe
     };
   }
 
-  const updatedSlots = { ...state.slots };
+  if (slot.pendingAction) {
+    return {
+      state,
+      log: appendLog(log, `${persona.name} is already charting the manor’s halls.`),
+      performed: false
+    };
+  }
+
+  const updatedSlots: Record<string, Slot> = {
+    ...state.slots,
+    [slot.id]: {
+      ...slot,
+      pendingAction: { type: 'explore-manor' }
+    }
+  };
+
+  const nextLog = appendLog(
+    log,
+    `${persona.name} ventures deeper into ${slot.name}, mapping its passages. They will report back soon.`
+  );
+
+  return {
+    state: {
+      ...state,
+      slots: updatedSlots
+    },
+    log: nextLog,
+    performed: true
+  };
+}
+
+function completeManorExploration(state: GameState, slotId: string, log: string[]): {
+  state: GameState;
+  log: string[];
+} {
+  const currentSlot = state.slots[slotId];
+  if (!currentSlot) {
+    return { state, log };
+  }
+
+  const persona = currentSlot.occupantId ? state.cards[currentSlot.occupantId] ?? null : null;
+  const missingKeys: ManorRoomTemplateKey[] = MANOR_ROOM_TEMPLATE_KEYS.filter((templateKey) => {
+    const template = SLOT_TEMPLATES[templateKey];
+    const restoredKey = template.repair ? SLOT_TEMPLATES[template.repair.targetKey].key : null;
+    return !Object.values(state.slots).some(
+      (existing) => existing.key === template.key || (restoredKey ? existing.key === restoredKey : false)
+    );
+  });
+
+  const updatedSlots: Record<string, Slot> = { ...state.slots };
   const revealedRooms: string[] = [];
 
   for (const key of missingKeys) {
@@ -660,18 +719,71 @@ function exploreManor(state: GameState, slot: Slot, log: string[]): SlotActionRe
     revealedRooms.push(newRoom.name);
   }
 
-  const nextState: GameState = {
-    ...state,
-    slots: updatedSlots
+  delete updatedSlots[slotId];
+
+  let updatedCards = state.cards;
+  let updatedHand = state.hand;
+  if (persona) {
+    updatedCards = {
+      ...state.cards,
+      [persona.id]: { ...persona, location: { area: 'hand' } }
+    };
+    updatedHand = addToHand(state.hand, persona.id);
+  }
+
+  let nextLog = log;
+  if (revealedRooms.length > 0) {
+    const roomsFragment = revealedRooms.join(', ');
+    const explorerName = persona ? persona.name : 'Your retinue';
+    nextLog = appendLog(
+      log,
+      `${explorerName} charts the manor’s halls, revealing ${roomsFragment} before the manor’s entrance seals behind them.`
+    );
+  } else {
+    const explorerName = persona ? persona.name : 'Your retinue';
+    nextLog = appendLog(
+      log,
+      `${explorerName} finds no further chambers awaiting discovery as the manor’s entrance seals behind them.`
+    );
+  }
+
+  return {
+    state: {
+      ...state,
+      slots: updatedSlots,
+      cards: updatedCards,
+      hand: updatedHand,
+      log: nextLog
+    },
+    log: nextLog
   };
+}
 
-  const roomsFragment = revealedRooms.join(', ');
-  const nextLog = appendLog(
-    log,
-    `${persona.name} charts the manor’s halls, revealing ${roomsFragment}.`
-  );
+function resolvePendingSlotActions(state: GameState, now: number): GameState {
+  let nextState = state;
+  const slotIds = Object.keys(state.slots);
 
-  return { state: nextState, log: nextLog, performed: true };
+  for (const slotId of slotIds) {
+    const slot = nextState.slots[slotId];
+    if (!slot || !slot.pendingAction) {
+      continue;
+    }
+    if (slot.lockedUntil && slot.lockedUntil > now) {
+      continue;
+    }
+
+    switch (slot.pendingAction.type) {
+      case 'explore-manor': {
+        const result = completeManorExploration(nextState, slotId, nextState.log);
+        nextState = result.state;
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  return nextState;
 }
 
 function repairManorRoom(state: GameState, slot: Slot, log: string[]): SlotActionResult {
@@ -953,50 +1065,59 @@ function expeditionSlot(state: GameState, slot: Slot, log: string[]): SlotAction
 }
 
 function activateSlot(state: GameState, slotId: string): SlotActionResult {
-  const slot = state.slots[slotId];
+  const preparedState = resolvePendingSlotActions(state, Date.now());
+  const slot = preparedState.slots[slotId];
   if (!slot || !slot.unlocked) {
-    return { state, log: appendLog(state.log, 'That slot is not yet available.'), performed: false };
+    return {
+      state: preparedState,
+      log: appendLog(preparedState.log, 'That slot is not yet available.'),
+      performed: false
+    };
   }
 
   const now = Date.now();
   if (slot.lockedUntil && slot.lockedUntil > now) {
     const remaining = slot.lockedUntil - now;
     const message = `${slot.name} is still resolving a previous action. ≈ ${formatDurationLabel(remaining)} remain.`;
-    return { state, log: appendLog(state.log, message), performed: false };
+    return {
+      state: preparedState,
+      log: appendLog(preparedState.log, message),
+      performed: false
+    };
   }
 
-  const log = state.log;
+  const log = preparedState.log;
 
   let result: SlotActionResult;
 
   switch (slot.type) {
     case 'hearth':
-      result = workHearth(state, slot, log);
+      result = workHearth(preparedState, slot, log);
       break;
     case 'work':
-      result = workJob(state, slot, log);
+      result = workJob(preparedState, slot, log);
       break;
     case 'study':
-      result = studySlot(state, slot, log);
+      result = studySlot(preparedState, slot, log);
       break;
     case 'ritual':
-      result = ritualSlot(state, slot, log);
+      result = ritualSlot(preparedState, slot, log);
       break;
     case 'expedition':
-      result = expeditionSlot(state, slot, log);
+      result = expeditionSlot(preparedState, slot, log);
       break;
     case 'manor':
       if (slot.state === 'damaged' && slot.repair) {
-        result = repairManorRoom(state, slot, log);
+        result = repairManorRoom(preparedState, slot, log);
       } else {
-        result = exploreManor(state, slot, log);
+        result = exploreManor(preparedState, slot, log);
       }
       break;
     case 'bedroom':
-      result = bedroomSlot(state, slot, log);
+      result = bedroomSlot(preparedState, slot, log);
       break;
     default:
-      result = { state, log, performed: false };
+      result = { state: preparedState, log, performed: false };
   }
 
   if (!result.performed) {
@@ -1008,7 +1129,7 @@ function activateSlot(state: GameState, slotId: string): SlotActionResult {
     return result;
   }
 
-  const lockDuration = getSlotLockDurationMs(refreshedSlot);
+  const lockDuration = getScaledSlotLockDurationMs(refreshedSlot, result.state.timeScale);
   const lockedSlot: Slot = {
     ...refreshedSlot,
     lockedUntil: Date.now() + lockDuration
@@ -1215,6 +1336,19 @@ function gameReducer(state: GameState, action: Action): GameState {
         return state;
       }
 
+      if (card.location.area === 'slot') {
+        const slot = state.slots[card.location.slotId];
+        if (slot && slot.lockedUntil && slot.lockedUntil > Date.now()) {
+          return {
+            ...state,
+            log: appendLog(
+              state.log,
+              `${card.name} is still committed to ${slot.name}. Wait for the action to resolve before recalling them.`
+            )
+          };
+        }
+      }
+
       let updatedSlots = state.slots;
       if (card.location.area === 'slot') {
         const slot = state.slots[card.location.slotId];
@@ -1294,6 +1428,7 @@ function gameReducer(state: GameState, action: Action): GameState {
       };
     }
     case 'ADVANCE_TIME': {
+      const now = Date.now();
       let updatedCards = { ...state.cards };
       let updatedSlots = { ...state.slots };
       let updatedHand = [...state.hand];
@@ -1413,12 +1548,43 @@ function gameReducer(state: GameState, action: Action): GameState {
         log: updatedLog
       };
 
+      nextState = resolvePendingSlotActions(nextState, now);
+
       if (Math.random() < 0.65) {
         const spawnResult = spawnOpportunity(nextState, nextState.log);
         nextState = { ...spawnResult.state, log: spawnResult.log };
       }
 
       return nextState;
+    }
+    case 'SET_TIME_SCALE': {
+      const nextScale = Math.max(0.25, action.scale);
+      if (nextScale === state.timeScale) {
+        return state;
+      }
+
+      const now = Date.now();
+      const adjustedSlots: Record<string, Slot> = {};
+
+      for (const [slotId, slot] of Object.entries(state.slots)) {
+        if (slot.lockedUntil && slot.lockedUntil > now) {
+          const remaining = slot.lockedUntil - now;
+          const baseRemaining = Math.round(remaining * state.timeScale);
+          const scaledRemaining = Math.max(0, Math.round(baseRemaining / nextScale));
+          adjustedSlots[slotId] = {
+            ...slot,
+            lockedUntil: scaledRemaining > 0 ? now + scaledRemaining : now
+          };
+        } else {
+          adjustedSlots[slotId] = slot;
+        }
+      }
+
+      return {
+        ...state,
+        timeScale: nextScale,
+        slots: adjustedSlots
+      };
     }
     default:
       return state;
@@ -1448,6 +1614,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'ADVANCE_TIME' });
   }, []);
 
+  const setTimeScale = useCallback((scale: number) => {
+    dispatch({ type: 'SET_TIME_SCALE', scale });
+  }, []);
+
   const getUpgradeCost = useCallback(
     (slotId: string) => {
       const slot = state.slots[slotId];
@@ -1464,9 +1634,19 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       activateSlot,
       upgradeSlot,
       advanceTime,
-      getUpgradeCost
+      getUpgradeCost,
+      setTimeScale
     }),
-    [state, moveCardToSlot, recallCard, activateSlot, upgradeSlot, advanceTime, getUpgradeCost]
+    [
+      state,
+      moveCardToSlot,
+      recallCard,
+      activateSlot,
+      upgradeSlot,
+      advanceTime,
+      getUpgradeCost,
+      setTimeScale
+    ]
   );
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

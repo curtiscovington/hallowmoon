@@ -309,6 +309,10 @@ function SlotView({
           )} remain.`
         : 'In disrepair — activate with a persona to begin restoration.'
       : null;
+  const explorationNote =
+    slot.pendingAction?.type === 'explore-manor'
+      ? 'Exploration underway within the manor.'
+      : null;
 
   function getActivateLabel(): string {
     switch (slot.type) {
@@ -494,12 +498,22 @@ function SlotView({
             Upgrade ({upgradeCost} ✦)
           </button>
           {assistant ? (
-            <button className="slot-card__action" type="button" onClick={() => onRecall(assistant.id)}>
+            <button
+              className="slot-card__action"
+              type="button"
+              onClick={() => onRecall(assistant.id)}
+              disabled={isSlotLocked}
+            >
               {`Recall ${assistant.name}`}
             </button>
           ) : null}
           {occupant ? (
-            <button className="slot-card__action" type="button" onClick={() => onRecall(occupant.id)}>
+            <button
+              className="slot-card__action"
+              type="button"
+              onClick={() => onRecall(occupant.id)}
+              disabled={isSlotLocked}
+            >
               {`Recall ${occupant.name}`}
             </button>
           ) : null}
@@ -525,6 +539,7 @@ function SlotView({
           {assistant && !assistantExpiry ? (
             <span className="slot-card__note">Assistant: {assistant.name}</span>
           ) : null}
+          {explorationNote ? <span className="slot-card__note">{explorationNote}</span> : null}
           {slot.type === 'work' && !isHeroInSlot ? (
             <span className="slot-card__note">Send your persona to work shifts.</span>
           ) : null}
@@ -535,8 +550,16 @@ function SlotView({
 }
 
 export default function App() {
-  const { state, moveCardToSlot, activateSlot, upgradeSlot, advanceTime, getUpgradeCost, recallCard } =
-    useGame();
+  const {
+    state,
+    moveCardToSlot,
+    activateSlot,
+    upgradeSlot,
+    advanceTime,
+    getUpgradeCost,
+    recallCard,
+    setTimeScale
+  } = useGame();
   const isDesktop = useMediaQuery('(min-width: 900px)');
   const [isPaused, setIsPaused] = useState(false);
   const [speed, setSpeed] = useState<SpeedOption>(1);
@@ -583,6 +606,10 @@ export default function App() {
     }
     prevIntervalRef.current = cycleDurationMs;
   }, [cycleDurationMs]);
+
+  useEffect(() => {
+    setTimeScale(speed);
+  }, [setTimeScale, speed]);
 
   const handCards = useMemo(
     () =>
