@@ -65,6 +65,7 @@ export interface Slot {
   state: SlotState;
   repair: SlotRepair | null;
   repairStarted: boolean;
+  lockedUntil: number | null;
 }
 
 export interface Discovery {

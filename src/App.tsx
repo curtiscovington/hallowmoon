@@ -4,7 +4,7 @@ import { CardInstance, Slot } from './state/types';
 
 const CARD_DRAG_TYPE = 'application/x-hallowmoon-card';
 
-const BASE_CYCLE_MS = 12000;
+const BASE_CYCLE_MS = 60000;
 const TIMER_RESOLUTION_MS = 200;
 const SPEED_OPTIONS = [1, 2, 3] as const;
 
@@ -134,11 +134,8 @@ function CardView({
   timing?: CardTimingContext;
 }) {
   const expiryInfo = timing ? describeCardExpiry(card, timing) : null;
-  const cyclesLabel =
-    !card.permanent && card.remainingTurns !== null
-      ? `${card.remainingTurns} cycle${card.remainingTurns === 1 ? '' : 's'} remain`
-      : null;
   const permanenceLabel = card.permanent ? 'permanent' : 'fleeting';
+  const metaLabel = expiryInfo ? `${permanenceLabel} · ≈ ${expiryInfo.durationLabel}` : permanenceLabel;
   const traitsLabel = card.traits.length > 0 ? card.traits.join(' · ') : null;
   const interactive = Boolean(onSelect);
   const tokenClasses = ['card-token', `card-token--${variant}`];
@@ -188,11 +185,7 @@ function CardView({
       <p className="card-token__description">{card.description}</p>
       <footer className="card-token__footer">
         <div className="card-token__footer-row">
-          <span>
-            {permanenceLabel}
-            {cyclesLabel ? ` · ${cyclesLabel}` : ''}
-          </span>
-          {expiryInfo ? <span className="card-token__timer">≈ {expiryInfo.durationLabel}</span> : null}
+          <span>{metaLabel}</span>
         </div>
         {traitsLabel ? (
           <div className="card-token__footer-row card-token__footer-row--traits">{traitsLabel}</div>
@@ -274,11 +267,17 @@ function SlotView({
   ];
   const occupantTraits =
     occupantTraitSources.length > 0 ? Array.from(new Set(occupantTraitSources)).join(' · ') : null;
+  const lockRemainingMs = slot.lockedUntil ? Math.max(0, slot.lockedUntil - Date.now()) : 0;
+  const isSlotLocked = Boolean(slot.lockedUntil && lockRemainingMs > 0);
+  const isSlotInteractive = slot.unlocked && !isSlotLocked;
   const slotClasses = ['slot-card'];
   if (!slot.unlocked) {
     slotClasses.push('slot-card--locked');
   }
-  if (isDragOver && slot.unlocked) {
+  if (isSlotLocked) {
+    slotClasses.push('slot-card--busy');
+  }
+  if (isDragOver && isSlotInteractive) {
     slotClasses.push('slot-card--active');
   }
   if (!showDetails) {
@@ -286,16 +285,28 @@ function SlotView({
   }
 
   const timerClasses = ['slot-card__timer'];
+  if (isSlotLocked) {
+    timerClasses.push('slot-card__timer--busy');
+  }
   if (isTimePaused) {
     timerClasses.push('slot-card__timer--paused');
   }
+  const timerMessage = isSlotLocked
+    ? isTimePaused
+      ? 'Resolving · paused'
+      : `Resolving · ≈ ${formatDuration(lockRemainingMs)}`
+    : isTimePaused
+    ? 'Time paused'
+    : `Next interval in ${formatDuration(timing.timeToNextCycleMs)}`;
 
   const occupantExpiry = occupant ? describeCardExpiry(occupant, timing) : null;
   const assistantExpiry = assistant ? describeCardExpiry(assistant, timing) : null;
   const repairNote =
     slot.state === 'damaged' && slot.repair
       ? slot.repairStarted
-        ? `${slot.repair.remaining} cycle${slot.repair.remaining === 1 ? '' : 's'} remain before restoration.`
+        ? `Restoration underway · ≈ ${formatDuration(
+            slot.repair.remaining * timing.cycleDurationMs
+          )} remain.`
         : 'In disrepair — activate with a persona to begin restoration.'
       : null;
 
@@ -319,7 +330,7 @@ function SlotView({
   }
 
   function handleDragEnter(event: DragEvent<HTMLButtonElement>) {
-    if (!slot.unlocked || !acceptsCard(event)) {
+    if (!isSlotInteractive || !acceptsCard(event)) {
       return;
     }
     event.preventDefault();
@@ -327,7 +338,7 @@ function SlotView({
   }
 
   function handleDragOver(event: DragEvent<HTMLButtonElement>) {
-    if (!slot.unlocked || !acceptsCard(event)) {
+    if (!isSlotInteractive || !acceptsCard(event)) {
       return;
     }
     event.preventDefault();
@@ -335,7 +346,7 @@ function SlotView({
   }
 
   function handleDragLeave(event: DragEvent<HTMLButtonElement>) {
-    if (!slot.unlocked) {
+    if (!isSlotInteractive) {
       return;
     }
     const nextTarget = event.relatedTarget as Node | null;
@@ -346,7 +357,7 @@ function SlotView({
   }
 
   function handleDrop(event: DragEvent<HTMLButtonElement>) {
-    if (!slot.unlocked) {
+    if (!isSlotInteractive) {
       return;
     }
     const cardId = event.dataTransfer?.getData(CARD_DRAG_TYPE);
@@ -360,11 +371,14 @@ function SlotView({
   }
 
   const dropzoneClasses = ['slot-card__dropzone'];
-  if (isDragOver && slot.unlocked) {
+  if (isDragOver && isSlotInteractive) {
     dropzoneClasses.push('slot-card__dropzone--active');
   }
   if (!slot.unlocked) {
     dropzoneClasses.push('slot-card__dropzone--locked');
+  }
+  if (isSlotLocked) {
+    dropzoneClasses.push('slot-card__dropzone--busy');
   }
   if (occupant) {
     dropzoneClasses.push('slot-card__dropzone--occupied');
@@ -410,16 +424,16 @@ function SlotView({
       <div className="slot-card__status-row">
         <span className="slot-card__status-label">{occupancyLabel}</span>
         <div className={timerClasses.join(' ')} role="timer">
-          {isTimePaused ? 'Time paused' : `Next cycle in ${formatDuration(timing.timeToNextCycleMs)}`}
+          {timerMessage}
         </div>
       </div>
       <button
         className={dropzoneClasses.join(' ')}
         type="button"
         aria-label={`Assign a card to ${slot.name}`}
-        aria-disabled={!slot.unlocked}
+        aria-disabled={!isSlotInteractive}
         onClick={() => {
-          if (slot.unlocked) {
+          if (isSlotInteractive) {
             onClick(slot.id);
           }
         }}
@@ -446,7 +460,7 @@ function SlotView({
         ) : (
           <div className="slot-card__placeholder" aria-live="polite">
             <span className="slot-card__placeholder-title">
-              {slot.unlocked ? 'Open for assignment' : 'Locked discovery'}
+              {slot.unlocked ? (isSlotLocked ? 'Resolving action' : 'Open for assignment') : 'Locked discovery'}
             </span>
             <span className="slot-card__placeholder-hint">Drop a compatible card here.</span>
           </div>
@@ -467,7 +481,7 @@ function SlotView({
             className="slot-card__action"
             type="button"
             onClick={() => onActivate(slot.id)}
-            disabled={!slot.unlocked}
+            disabled={!isSlotInteractive}
           >
             {getActivateLabel()}
           </button>
@@ -475,7 +489,7 @@ function SlotView({
             className="slot-card__action"
             type="button"
             onClick={() => onUpgrade(slot.id)}
-            disabled={!slot.unlocked || slot.state === 'damaged' || slot.upgradeCost === 0}
+            disabled={!isSlotInteractive || slot.state === 'damaged' || slot.upgradeCost === 0}
           >
             Upgrade ({upgradeCost} ✦)
           </button>
@@ -494,14 +508,17 @@ function SlotView({
           {!occupant && !slot.unlocked ? (
             <span className="slot-card__note">Requires a discovery.</span>
           ) : null}
+          {isSlotLocked && lockRemainingMs > 0 ? (
+            <span className="slot-card__note">Resolving action · ≈ {formatDuration(lockRemainingMs)} remain</span>
+          ) : null}
           {occupantExpiry ? (
             <span className="slot-card__note">
-              {occupantExpiry.cycles} cycle{occupantExpiry.cycles === 1 ? '' : 's'} remain · ≈ {occupantExpiry.durationLabel}
+              ≈ {occupantExpiry.durationLabel} remain for {occupant?.name ?? 'the occupant'}
             </span>
           ) : null}
           {assistantExpiry ? (
             <span className="slot-card__note">
-              {(assistant?.name ?? 'Assistant')} has {assistantExpiry.cycles} cycle{assistantExpiry.cycles === 1 ? '' : 's'} remaining · ≈ {assistantExpiry.durationLabel}
+              {(assistant?.name ?? 'Assistant')} ≈ {assistantExpiry.durationLabel} remain
             </span>
           ) : null}
           {repairNote ? <span className="slot-card__note">{repairNote}</span> : null}
@@ -589,7 +606,8 @@ export default function App() {
     headerTimerClasses.push('game-header__timer--paused');
   }
 
-  const nextCycleLabel = isPaused ? 'Time paused' : `Next cycle in ${formatDuration(timeToNextCycle)}`;
+  const nextIntervalLabel = isPaused ? 'Time paused' : `Next interval in ${formatDuration(timeToNextCycle)}`;
+  const cadenceLabel = `Cadence ≈ ${formatDuration(cycleDurationMs)}`;
 
   const selectedCard = selectedCardId ? state.cards[selectedCardId] ?? null : null;
 
@@ -695,12 +713,12 @@ export default function App() {
         </div>
         <div className="game-header__status">
           <div className="game-header__status-main">
-            <div className="game-header__cycle" aria-label="Current cycle">
-              <span className="game-header__cycle-label">Cycle</span>
-              <span className="game-header__cycle-value">{state.cycle}</span>
+            <div className="game-header__cadence" aria-label="Current cadence">
+              <span className="game-header__cadence-label">Cadence</span>
+              <span className="game-header__cadence-value">{cadenceLabel}</span>
             </div>
             <div className={headerTimerClasses.join(' ')} role="timer">
-              {nextCycleLabel}
+              {nextIntervalLabel}
             </div>
           </div>
           <div className="game-header__resources" aria-label="Resource overview">
