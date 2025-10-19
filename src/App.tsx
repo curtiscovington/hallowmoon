@@ -15,6 +15,45 @@ interface CardTimingContext {
   timeToNextCycleMs: number;
 }
 
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return window.matchMedia(query).matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return () => undefined;
+    }
+
+    const mediaQuery = window.matchMedia(query);
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      setMatches(event.matches);
+    };
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleChange);
+    } else {
+      mediaQuery.addListener(handleChange);
+    }
+
+    setMatches(mediaQuery.matches);
+
+    return () => {
+      if (typeof mediaQuery.removeEventListener === 'function') {
+        mediaQuery.removeEventListener('change', handleChange);
+      } else {
+        mediaQuery.removeListener(handleChange);
+      }
+    };
+  }, [query]);
+
+  return matches;
+}
+
 function formatDuration(ms: number): string {
   const clamped = Math.max(0, ms);
   if (clamped >= 60000) {
@@ -204,7 +243,15 @@ function SlotView({
   isTimePaused: boolean;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
-  const occupancyLabel = occupant ? occupant.name : 'Unoccupied';
+  const isDesktop = useMediaQuery('(min-width: 900px)');
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const showDetails = isDesktop || isDetailsOpen;
+  const detailsId = `slot-details-${slot.id}`;
+  const occupancyLabel = occupant
+    ? occupant.name
+    : slot.unlocked
+    ? 'Open for assignment'
+    : 'Locked discovery';
   const acceptanceLabel = describeSlotAcceptance(slot.accepted);
   const occupantTraits = occupant && occupant.traits.length > 0 ? occupant.traits.join(' · ') : null;
   const slotClasses = ['slot-card'];
@@ -213,6 +260,9 @@ function SlotView({
   }
   if (isDragOver && slot.unlocked) {
     slotClasses.push('slot-card--active');
+  }
+  if (!showDetails) {
+    slotClasses.push('slot-card--collapsed');
   }
 
   const timerClasses = ['slot-card__timer'];
@@ -282,21 +332,33 @@ function SlotView({
   }
 
   return (
-    <section className={slotClasses.join(' ')}>
+    <section className={slotClasses.join(' ')} data-collapsed={!showDetails}>
       <header className="slot-card__header">
         <div className="slot-card__title-block">
           <span className="slot-card__type">{slot.type}</span>
           <h3 className="slot-card__name">{slot.name}</h3>
         </div>
-        <span className="slot-card__level">Lv {slot.level}</span>
+        <div className="slot-card__header-actions">
+          <span className="slot-card__level">Lv {slot.level}</span>
+          {!isDesktop ? (
+            <button
+              type="button"
+              className="slot-card__toggle"
+              onClick={() => setIsDetailsOpen((prev) => !prev)}
+              aria-expanded={showDetails}
+              aria-controls={detailsId}
+            >
+              {showDetails ? 'Hide details' : 'Show details'}
+            </button>
+          ) : null}
+        </div>
       </header>
       <p className="slot-card__description">{slot.description}</p>
-      <div className="slot-card__meta">
-        <span className="slot-card__traits">{slot.traits.join(' · ')}</span>
-        <span className="slot-card__accepted">{acceptanceLabel}</span>
-      </div>
-      <div className={timerClasses.join(' ')} role="timer">
-        {isTimePaused ? 'Time paused' : `Next cycle in ${formatDuration(timing.timeToNextCycleMs)}`}
+      <div className="slot-card__status-row">
+        <span className="slot-card__status-label">{occupancyLabel}</span>
+        <div className={timerClasses.join(' ')} role="timer">
+          {isTimePaused ? 'Time paused' : `Next cycle in ${formatDuration(timing.timeToNextCycleMs)}`}
+        </div>
       </div>
       <button
         className={dropzoneClasses.join(' ')}
@@ -330,45 +392,59 @@ function SlotView({
           />
         ) : (
           <div className="slot-card__placeholder" aria-live="polite">
-            <span className="slot-card__placeholder-title">{occupancyLabel}</span>
+            <span className="slot-card__placeholder-title">
+              {slot.unlocked ? 'Open for assignment' : 'Locked discovery'}
+            </span>
             <span className="slot-card__placeholder-hint">Drop a compatible card here.</span>
           </div>
         )}
         {occupantTraits ? <span className="slot-card__occupant-traits">{occupantTraits}</span> : null}
       </button>
-      <div className="slot-card__actions">
-        <button
-          className="slot-card__action"
-          type="button"
-          onClick={() => onActivate(slot.id)}
-          disabled={!slot.unlocked}
-        >
-          {slot.type === 'work' ? 'Work' : slot.type === 'hearth' ? 'Rest' : 'Activate'}
-        </button>
-        <button
-          className="slot-card__action"
-          type="button"
-          onClick={() => onUpgrade(slot.id)}
-          disabled={!slot.unlocked}
-        >
-          Upgrade ({upgradeCost} ✦)
-        </button>
-        {occupant ? (
-          <button className="slot-card__action" type="button" onClick={() => onRecall(occupant.id)}>
-            Recall
+      <div
+        id={detailsId}
+        className={`slot-card__details${showDetails ? ' slot-card__details--open' : ''}`}
+        aria-hidden={!showDetails}
+      >
+        <div className="slot-card__meta">
+          <span className="slot-card__traits">{slot.traits.join(' · ')}</span>
+          <span className="slot-card__accepted">{acceptanceLabel}</span>
+        </div>
+        <div className="slot-card__actions">
+          <button
+            className="slot-card__action"
+            type="button"
+            onClick={() => onActivate(slot.id)}
+            disabled={!slot.unlocked}
+          >
+            {slot.type === 'work' ? 'Work' : slot.type === 'hearth' ? 'Rest' : 'Activate'}
           </button>
-        ) : null}
-        {!occupant && !slot.unlocked ? (
-          <span className="slot-card__note">Requires a discovery.</span>
-        ) : null}
-        {occupantExpiry ? (
-          <span className="slot-card__note">
-            {occupantExpiry.cycles} cycle{occupantExpiry.cycles === 1 ? '' : 's'} remain · ≈ {occupantExpiry.durationLabel}
-          </span>
-        ) : null}
-        {slot.type === 'work' && !isHeroInSlot ? (
-          <span className="slot-card__note">Send your persona to work shifts.</span>
-        ) : null}
+          <button
+            className="slot-card__action"
+            type="button"
+            onClick={() => onUpgrade(slot.id)}
+            disabled={!slot.unlocked}
+          >
+            Upgrade ({upgradeCost} ✦)
+          </button>
+          {occupant ? (
+            <button className="slot-card__action" type="button" onClick={() => onRecall(occupant.id)}>
+              Recall
+            </button>
+          ) : null}
+        </div>
+        <div className="slot-card__notes">
+          {!occupant && !slot.unlocked ? (
+            <span className="slot-card__note">Requires a discovery.</span>
+          ) : null}
+          {occupantExpiry ? (
+            <span className="slot-card__note">
+              {occupantExpiry.cycles} cycle{occupantExpiry.cycles === 1 ? '' : 's'} remain · ≈ {occupantExpiry.durationLabel}
+            </span>
+          ) : null}
+          {slot.type === 'work' && !isHeroInSlot ? (
+            <span className="slot-card__note">Send your persona to work shifts.</span>
+          ) : null}
+        </div>
       </div>
     </section>
   );
@@ -384,6 +460,8 @@ export default function App() {
   const prevIntervalRef = useRef(cycleDurationMs);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
+  const [isChronicleOpen, setIsChronicleOpen] = useState(false);
+  const isDesktop = useMediaQuery('(min-width: 900px)');
 
   useEffect(() => {
     if (isPaused) {
@@ -499,11 +577,46 @@ export default function App() {
     setTimeToNextCycle(cycleDurationMs);
   }
 
+  useEffect(() => {
+    if (isDesktop) {
+      setIsChronicleOpen(false);
+    }
+  }, [isDesktop]);
+
   const resourceTracks = [
     { label: 'Coin', value: state.resources.coin, icon: '🪙' },
     { label: 'Lore', value: state.resources.lore, icon: '📜' },
     { label: 'Glimmer', value: state.resources.glimmer, icon: '✨' }
   ];
+
+  const chronicleTitleId = 'chronicle-title';
+
+  const chronicleContent = (
+    <>
+      <h2 id={chronicleTitleId} className="game-log__title">
+        Chronicle
+      </h2>
+      <ul className="game-log__entries">
+        {state.log.map((entry, index) => (
+          <li key={index} className="game-log__entry">
+            {entry}
+          </li>
+        ))}
+      </ul>
+      {state.discoveries.length > 0 ? (
+        <div className="game-log__discoveries">
+          <h3>Discoveries</h3>
+          <ul>
+            {state.discoveries.map((discovery) => (
+              <li key={discovery.id}>
+                <strong>{discovery.name}</strong> · {discovery.description}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </>
+  );
 
   return (
     <div className="game-shell">
@@ -517,55 +630,68 @@ export default function App() {
         </div>
         <div className="game-header__status">
           <div className="game-header__status-main">
-            <div className="game-header__cycle">Cycle {state.cycle}</div>
+            <div className="game-header__cycle" aria-label="Current cycle">
+              <span className="game-header__cycle-label">Cycle</span>
+              <span className="game-header__cycle-value">{state.cycle}</span>
+            </div>
             <div className={headerTimerClasses.join(' ')} role="timer">
               {nextCycleLabel}
             </div>
           </div>
-          <div className="game-header__resources">
-            {resourceTracks.map((track) => (
-              <ResourceTrack key={track.label} {...track} />
-            ))}
-          </div>
-          <div className="game-header__controls">
-            <button
-              className="game-header__toggle"
-              type="button"
-              onClick={() => setIsPaused((prev) => !prev)}
-            >
-              {isPaused ? 'Resume Time' : 'Pause Time'}
-            </button>
-            <div className="game-header__speed-group" role="group" aria-label="Time speed">
-              <span className="game-header__speed-label">Speed</span>
-              <div className="game-header__speed-buttons">
-                {SPEED_OPTIONS.map((option) => {
-                  const isActive = option === speed;
-                  return (
-                    <button
-                      key={option}
-                      className={`game-header__speed-button${
-                        isActive ? ' game-header__speed-button--active' : ''
-                      }`}
-                      type="button"
-                      onClick={() => {
-                        if (!isActive) {
-                          setSpeed(option);
-                        }
-                      }}
-                      aria-pressed={isActive}
-                    >
-                      {formatSpeedDisplay(option)}×
-                    </button>
-                  );
-                })}
-              </div>
+          <div className="game-header__resources" aria-label="Resource overview">
+            <div className="game-header__resources-scroll">
+              {resourceTracks.map((track) => (
+                <ResourceTrack key={track.label} {...track} />
+              ))}
             </div>
-            <button className="game-header__advance" type="button" onClick={handleAdvanceNow}>
-              Advance Now
-            </button>
           </div>
         </div>
       </header>
+
+      <nav className="game-controls" aria-label="Time controls">
+        <button
+          className="game-controls__toggle"
+          type="button"
+          onClick={() => setIsPaused((prev) => !prev)}
+        >
+          {isPaused ? 'Resume time' : 'Pause time'}
+        </button>
+        <div className="game-controls__speed" role="group" aria-label="Time speed">
+          <span className="game-controls__speed-label">Speed</span>
+          <div className="game-controls__speed-buttons">
+            {SPEED_OPTIONS.map((option) => {
+              const isActive = option === speed;
+              return (
+                <button
+                  key={option}
+                  className={`game-controls__speed-button${
+                    isActive ? ' game-controls__speed-button--active' : ''
+                  }`}
+                  type="button"
+                  onClick={() => {
+                    if (!isActive) {
+                      setSpeed(option);
+                    }
+                  }}
+                  aria-pressed={isActive}
+                >
+                  {formatSpeedDisplay(option)}×
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <button className="game-controls__advance" type="button" onClick={handleAdvanceNow}>
+          Advance now
+        </button>
+        <button
+          className="game-controls__chronicle"
+          type="button"
+          onClick={() => setIsChronicleOpen(true)}
+        >
+          Chronicle
+        </button>
+      </nav>
 
       <main className="game-main">
         <section className="slots-grid" aria-label="Available slots">
@@ -592,28 +718,11 @@ export default function App() {
             );
           })}
         </section>
-        <aside className="game-log" aria-live="polite">
-          <h2 className="game-log__title">Chronicle</h2>
-          <ul className="game-log__entries">
-            {state.log.map((entry, index) => (
-              <li key={index} className="game-log__entry">
-                {entry}
-              </li>
-            ))}
-          </ul>
-          {state.discoveries.length > 0 ? (
-            <div className="game-log__discoveries">
-              <h3>Discoveries</h3>
-              <ul>
-                {state.discoveries.map((discovery) => (
-                  <li key={discovery.id}>
-                    <strong>{discovery.name}</strong> · {discovery.description}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </aside>
+        {isDesktop ? (
+          <aside className="game-log" aria-live="polite">
+            {chronicleContent}
+          </aside>
+        ) : null}
       </main>
 
       <footer className="game-hand" aria-label="Cards in hand">
@@ -640,6 +749,29 @@ export default function App() {
           ))}
         </div>
       </footer>
+
+      {!isDesktop && isChronicleOpen ? (
+        <div className="chronicle-drawer" role="dialog" aria-modal="true" aria-labelledby={chronicleTitleId}>
+          <button
+            type="button"
+            className="chronicle-drawer__backdrop"
+            aria-label="Close chronicle"
+            onClick={() => setIsChronicleOpen(false)}
+          />
+          <div className="chronicle-drawer__panel">
+            <button
+              type="button"
+              className="chronicle-drawer__close"
+              onClick={() => setIsChronicleOpen(false)}
+            >
+              Close
+            </button>
+            <div className="chronicle-drawer__content" aria-live="polite">
+              {chronicleContent}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
