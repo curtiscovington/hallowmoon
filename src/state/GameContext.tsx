@@ -594,7 +594,7 @@ function exploreManor(state: GameState, slot: Slot, log: string[]): { state: Gam
     };
   }
 
-  let updatedSlots = { ...state.slots };
+  const updatedSlots = { ...state.slots };
   const revealedRooms: string[] = [];
 
   for (const key of missingKeys) {
