@@ -49,6 +49,7 @@ interface SlotTemplate {
 }
 
 const SLOT_LOCK_BASE_MS = 60000;
+const SLOT_ACTION_COMPLETION_TOLERANCE_MS = 250;
 
 const SLOT_LOCK_DURATIONS: Record<SlotType, number> = {
   hearth: SLOT_LOCK_BASE_MS,
@@ -768,8 +769,13 @@ function resolvePendingSlotActions(state: GameState, now: number): GameState {
     if (!slot || !slot.pendingAction) {
       continue;
     }
-    if (slot.lockedUntil && slot.lockedUntil > now) {
-      continue;
+    if (slot.lockedUntil) {
+      const remaining = slot.lockedUntil - now;
+      // Allow a small grace window so we don't require another full cycle when the
+      // lock expires between timer ticks.
+      if (remaining > SLOT_ACTION_COMPLETION_TOLERANCE_MS) {
+        continue;
+      }
     }
 
     switch (slot.pendingAction.type) {
