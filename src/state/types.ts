@@ -1,221 +1,75 @@
-export type Species = 'Werewolf' | 'Vampire';
-export type LocationKey = 'village' | 'forest' | 'ruins';
-export type TrainableStat = 'str' | 'agi' | 'wis';
+export type ResourceType = 'coin' | 'lore' | 'glimmer';
 
-export interface VisualAsset {
-  src: string;
-  alt: string;
-  credit?: string;
+export interface Resources {
+  coin: number;
+  lore: number;
+  glimmer: number;
 }
 
-export type MarketItemKey =
-  | 'moon-tonic'
-  | 'silvered-armaments'
-  | 'occult-primer'
-  | 'lunar-wardstone';
+export type CardArchetype = 'persona' | 'inspiration' | 'relic' | 'task';
 
-export interface MarketItem {
-  key: MarketItemKey;
+export interface DiscoverySeed {
+  key: string;
   name: string;
   description: string;
-  cost: number;
-  artwork?: VisualAsset;
-  flavor?: string;
 }
 
-export type LootRarity = 'common' | 'rare' | 'epic';
+export interface CardReward {
+  resources?: Partial<Resources>;
+  discovery?: DiscoverySeed;
+}
 
-export interface BattleRewardItem {
+export type CardLocation =
+  | { area: 'hand' }
+  | { area: 'slot'; slotId: string }
+  | { area: 'lost' };
+
+export interface CardInstance {
   id: string;
+  key: string;
   name: string;
+  type: CardArchetype;
   description: string;
-  rarity: LootRarity;
+  traits: string[];
+  permanent: boolean;
+  remainingTurns: number | null;
+  rewards?: CardReward;
+  location: CardLocation;
 }
 
-export interface Hero {
+export type SlotType = 'hearth' | 'work' | 'study' | 'ritual' | 'expedition';
+
+export type SlotAcceptance = 'persona-only' | 'non-persona' | 'any';
+
+export interface Slot {
+  id: string;
+  key: string;
   name: string;
-  species: Species;
+  type: SlotType;
+  description: string;
   level: number;
-  xp: number;
-  coins: number;
-  currentHp: number;
-  maxHp: number;
-  str: number;
-  agi: number;
-  wis: number;
-  energy: number;
-  maxEnergy: number;
+  upgradeCost: number;
+  traits: string[];
+  accepted: SlotAcceptance;
+  occupantId: string | null;
+  unlocked: boolean;
 }
 
-export interface BattleMove {
-  key: string;
-  name: string;
-  description: string;
-  type: 'attack' | 'buff' | 'special' | 'debuff';
-  chargeTurns?: number;
-}
-
-export interface EnemyMove {
-  key: string;
-  name: string;
-  description: string;
-  type: 'attack' | 'debuff';
-  scale: 'str' | 'wis';
-  windUpTurns?: number;
-}
-
-export interface BattleStatus {
-  key: string;
-  label: string;
-  description: string;
-  type: 'buff' | 'debuff';
-  remainingTurns: number;
-  modifiers?: Partial<Record<'str' | 'agi' | 'wis', number>>;
-  justApplied?: boolean;
-}
-
-export interface PendingAction {
-  owner: 'hero' | 'enemy';
-  key: string;
-  name: string;
-  description: string;
-  remainingTurns: number;
-  totalTurns: number;
-  payload?: Record<string, number>;
-}
-
-export interface Enemy {
+export interface Discovery {
   id: string;
-  name: string;
-  species: Species;
-  location: LocationKey;
-  maxHp: number;
-  str: number;
-  agi: number;
-  wis: number;
-  coins: number;
-  xp: number;
-  description: string;
-  moves: EnemyMove[];
-  artwork?: VisualAsset;
-}
-
-export interface BattleState {
-  enemy: Enemy;
-  heroHp: number;
-  enemyHp: number;
-  heroStrMod: number;
-  heroWisMod: number;
-  heroAgiMod: number;
-  enemyStrMod: number;
-  enemyAgiMod: number;
-  heroStatuses: BattleStatus[];
-  enemyStatuses: BattleStatus[];
-  pendingActions: PendingAction[];
-  log: string[];
-  turn: 'hero' | 'enemy';
-}
-
-export interface HeroProgressSnapshot {
-  before: {
-    level: number;
-    xp: number;
-    coins: number;
-  };
-  after: {
-    level: number;
-    xp: number;
-    coins: number;
-  };
-  levelUps: string[];
-}
-
-export interface PostBattleRewards {
-  enemyName: string;
-  enemyArtwork?: VisualAsset;
-  xpEarned: number;
-  coinsEarned: number;
-  items: BattleRewardItem[];
-  heroProgress: HeroProgressSnapshot;
-}
-
-export type RunOptionType = 'battle' | 'event' | 'retreat';
-
-export type RunEventPayload =
-  | { kind: 'heal'; amount: number }
-  | { kind: 'energy'; amount: number }
-  | { kind: 'coins'; amount: number }
-  | { kind: 'relic' };
-
-export interface RunOption {
-  id: string;
-  type: RunOptionType;
-  label: string;
-  description: string;
-  payload?: RunEventPayload;
-}
-
-export type RunRelicEffect =
-  | { kind: 'post-battle-heal'; amount: number }
-  | { kind: 'pre-battle-energy'; amount: number }
-  | { kind: 'extra-option'; amount: number }
-  | { kind: 'bonus-coins'; amount: number };
-
-export interface RunRelic {
-  id: string;
+  key: string;
   name: string;
   description: string;
-  effect: RunRelicEffect;
+  cycle: number;
 }
-
-export interface RunStepLog {
-  depth: number;
-  choice: string;
-  summary: string;
-}
-
-export interface RunState {
-  depth: number;
-  relics: RunRelic[];
-  options: RunOption[];
-  log: RunStepLog[];
-  pendingBattle?: { optionId: string; label: string };
-  awaitingNextStep: boolean;
-  completed: boolean;
-  victoryCount: number;
-  pendingMessages: string[];
-}
-
-export interface TownProgress {
-  moonShards: number;
-  blessingLevel: number;
-}
-
-export type GameView =
-  | 'create'
-  | 'hero'
-  | 'map'
-  | 'run'
-  | 'battle'
-  | 'training'
-  | 'market'
-  | 'post-battle';
 
 export interface GameState {
-  hero: Hero | null;
-  view: GameView;
-  location: LocationKey;
-  battle: BattleState | null;
-  message: string | null;
-  marketInventory: MarketItem[];
-  postBattleRewards: PostBattleRewards | null;
-  run: RunState | null;
-  townProgress: TownProgress;
-}
-
-export interface PersistedState {
-  hero: Hero | null;
-  location: LocationKey;
-  timestamp: number;
-  townProgress: TownProgress;
+  cycle: number;
+  heroCardId: string;
+  cards: Record<string, CardInstance>;
+  hand: string[];
+  slots: Record<string, Slot>;
+  resources: Resources;
+  log: string[];
+  discoveries: Discovery[];
 }
