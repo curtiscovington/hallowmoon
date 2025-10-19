@@ -6,7 +6,7 @@ const CARD_DRAG_TYPE = 'application/x-hallowmoon-card';
 
 const BASE_CYCLE_MS = 12000;
 const TIMER_RESOLUTION_MS = 200;
-const SPEED_OPTIONS = [0.5, 1, 2, 3] as const;
+const SPEED_OPTIONS = [1, 2, 3] as const;
 
 type SpeedOption = (typeof SPEED_OPTIONS)[number];
 
@@ -213,6 +213,14 @@ function describeSlotAcceptance(accepted: Slot['accepted']): string {
   }
 }
 
+const SLOT_TYPE_INFO: Record<Slot['type'], { label: string; icon: string }> = {
+  hearth: { label: 'Hearth', icon: '🔥' },
+  work: { label: 'Work', icon: '🛠' },
+  study: { label: 'Study', icon: '📚' },
+  ritual: { label: 'Ritual', icon: '🔮' },
+  expedition: { label: 'Expedition', icon: '🧭' }
+};
+
 function SlotView({
   slot,
   occupant,
@@ -247,6 +255,7 @@ function SlotView({
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const showDetails = isDesktop || isDetailsOpen;
   const detailsId = `slot-details-${slot.id}`;
+  const slotTypeInfo = SLOT_TYPE_INFO[slot.type];
   const occupancyLabel = occupant
     ? occupant.name
     : slot.unlocked
@@ -326,16 +335,27 @@ function SlotView({
   }
   if (occupant) {
     dropzoneClasses.push('slot-card__dropzone--occupied');
+  } else {
+    dropzoneClasses.push('slot-card__dropzone--empty');
   }
   if (isHeroInSlot) {
     dropzoneClasses.push('slot-card__dropzone--hero');
   }
 
   return (
-    <section className={slotClasses.join(' ')} data-collapsed={!showDetails}>
+    <section
+      className={slotClasses.join(' ')}
+      data-collapsed={!showDetails}
+      data-slot-type={slot.type}
+    >
       <header className="slot-card__header">
         <div className="slot-card__title-block">
-          <span className="slot-card__type">{slot.type}</span>
+          <span className="slot-card__type" aria-label={`${slotTypeInfo.label} slot`}>
+            <span className="slot-card__type-icon" aria-hidden="true">
+              {slotTypeInfo.icon}
+            </span>
+            <span className="slot-card__type-label">{slotTypeInfo.label}</span>
+          </span>
           <h3 className="slot-card__name">{slot.name}</h3>
         </div>
         <div className="slot-card__header-actions">
@@ -647,50 +667,52 @@ export default function App() {
       </header>
 
       <nav className="game-controls" aria-label="Time controls">
-        <div className="game-controls__time">
-          <button
-            className="game-controls__pause"
-            type="button"
-            aria-label={isPaused ? 'Resume time' : 'Pause time'}
-            aria-pressed={isPaused}
-            onClick={() => setIsPaused((prev) => !prev)}
-          >
-            <span aria-hidden="true" className="game-controls__pause-icon">
-              {isPaused ? '▶' : '⏸'}
-            </span>
-          </button>
-          <div className="game-controls__speed" role="group" aria-label="Time speed">
-            <span className="sr-only">Time speed</span>
-            <div className="game-controls__speed-buttons">
-              {SPEED_OPTIONS.map((option) => {
-                const isActive = option === speed;
-                return (
-                  <button
-                    key={option}
-                    className={`game-controls__speed-button${
-                      isActive ? ' game-controls__speed-button--active' : ''
-                    }`}
-                    type="button"
-                    onClick={() => {
-                      if (!isActive) {
-                        setSpeed(option);
-                      }
-                    }}
-                    aria-pressed={isActive}
-                  >
-                    {formatSpeedDisplay(option)}×
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
         <button
-          className="game-controls__chronicle"
+          className="game-controls__button game-controls__button--pause"
           type="button"
-          onClick={() => setIsChronicleOpen(true)}
+          aria-label={isPaused ? 'Resume time' : 'Pause time'}
+          aria-pressed={isPaused}
+          onClick={() => setIsPaused((prev) => !prev)}
         >
-          Chronicle
+          <span className="sr-only">{isPaused ? 'Resume time' : 'Pause time'}</span>
+          <span aria-hidden="true" className="game-controls__icon">
+            {isPaused ? '▶' : '⏸'}
+          </span>
+        </button>
+        {SPEED_OPTIONS.map((option) => {
+          const isActive = option === speed;
+          return (
+            <button
+              key={option}
+              className={`game-controls__button game-controls__button--speed${
+                isActive ? ' game-controls__button--active' : ''
+              }`}
+              type="button"
+              aria-label={`${formatSpeedDisplay(option)} times speed`}
+              aria-pressed={isActive}
+              onClick={() => {
+                if (!isActive) {
+                  setSpeed(option);
+                }
+              }}
+            >
+              {formatSpeedDisplay(option)}
+            </button>
+          );
+        })}
+        <button
+          className={`game-controls__button game-controls__button--chronicle${
+            isChronicleOpen ? ' game-controls__button--active' : ''
+          }`}
+          type="button"
+          aria-label={isChronicleOpen ? 'Close chronicle' : 'Open chronicle'}
+          aria-pressed={isChronicleOpen}
+          onClick={() => setIsChronicleOpen((prev) => !prev)}
+        >
+          <span className="sr-only">{isChronicleOpen ? 'Close chronicle' : 'Open chronicle'}</span>
+          <span aria-hidden="true" className="game-controls__icon">
+            📜
+          </span>
         </button>
       </nav>
 

@@ -44,6 +44,7 @@ These guidelines capture the shared visual and interaction language for the Hall
 - **Time controls:** Keep the floating timer bar to a single row. Pair a pause/resume icon button with inline speed chips, and avoid manual "advance" actions beyond unpausing.
 - **Buttons & chips:** Primary buttons carry solid fill and drop shadow; secondary/tertiary use ghost or outline styles. Chips display icon + label; wrap overflow with ellipsis rather than stacking.
 - **Timers:** Present both countdown text and visual progress when an action can expire. Freeze progress bars when time is paused.
+- **Slot cards:** Prefix card headers with a type badge (icon + uppercase label) tinted to match the slot purpose—amber for work, cyan for study, rose for hearth, violet for ritual, and mint for expeditions. Mirror the tint inside empty dropzones so players can identify compatible slots at a glance while keeping occupied zones in a neutral indigo fill.
 
 ## Interaction Patterns
 - Highlight drag sources with a shadow and scale (max 1.02). Drop targets should glow subtly once a compatible item hovers.
