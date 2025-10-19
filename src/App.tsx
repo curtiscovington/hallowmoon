@@ -1,4 +1,4 @@
-import { DragEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { DragEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useGame } from './state/GameContext';
 import { CardInstance, Slot } from './state/types';
 
@@ -453,6 +453,7 @@ function SlotView({
 export default function App() {
   const { state, moveCardToSlot, activateSlot, upgradeSlot, advanceTime, getUpgradeCost, recallCard } =
     useGame();
+  const isDesktop = useMediaQuery('(min-width: 900px)');
   const [isPaused, setIsPaused] = useState(false);
   const [speed, setSpeed] = useState<SpeedOption>(1);
   const cycleDurationMs = useMemo(() => Math.round(BASE_CYCLE_MS / speed), [speed]);
@@ -461,7 +462,8 @@ export default function App() {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
   const [isChronicleOpen, setIsChronicleOpen] = useState(false);
-  const isDesktop = useMediaQuery('(min-width: 900px)');
+  const [isHandOpen, setIsHandOpen] = useState(isDesktop);
+  const handPanelId = useId();
 
   useEffect(() => {
     if (isPaused) {
@@ -572,15 +574,11 @@ export default function App() {
     event.dataTransfer.dropEffect = 'move';
   }
 
-  function handleAdvanceNow() {
-    advanceTime();
-    setTimeToNextCycle(cycleDurationMs);
-  }
-
   useEffect(() => {
     if (isDesktop) {
       setIsChronicleOpen(false);
     }
+    setIsHandOpen(isDesktop);
   }, [isDesktop]);
 
   const resourceTracks = [
@@ -649,41 +647,44 @@ export default function App() {
       </header>
 
       <nav className="game-controls" aria-label="Time controls">
-        <button
-          className="game-controls__toggle"
-          type="button"
-          onClick={() => setIsPaused((prev) => !prev)}
-        >
-          {isPaused ? 'Resume time' : 'Pause time'}
-        </button>
-        <div className="game-controls__speed" role="group" aria-label="Time speed">
-          <span className="game-controls__speed-label">Speed</span>
-          <div className="game-controls__speed-buttons">
-            {SPEED_OPTIONS.map((option) => {
-              const isActive = option === speed;
-              return (
-                <button
-                  key={option}
-                  className={`game-controls__speed-button${
-                    isActive ? ' game-controls__speed-button--active' : ''
-                  }`}
-                  type="button"
-                  onClick={() => {
-                    if (!isActive) {
-                      setSpeed(option);
-                    }
-                  }}
-                  aria-pressed={isActive}
-                >
-                  {formatSpeedDisplay(option)}×
-                </button>
-              );
-            })}
+        <div className="game-controls__time">
+          <button
+            className="game-controls__pause"
+            type="button"
+            aria-label={isPaused ? 'Resume time' : 'Pause time'}
+            aria-pressed={isPaused}
+            onClick={() => setIsPaused((prev) => !prev)}
+          >
+            <span aria-hidden="true" className="game-controls__pause-icon">
+              {isPaused ? '▶' : '⏸'}
+            </span>
+          </button>
+          <div className="game-controls__speed" role="group" aria-label="Time speed">
+            <span className="sr-only">Time speed</span>
+            <div className="game-controls__speed-buttons">
+              {SPEED_OPTIONS.map((option) => {
+                const isActive = option === speed;
+                return (
+                  <button
+                    key={option}
+                    className={`game-controls__speed-button${
+                      isActive ? ' game-controls__speed-button--active' : ''
+                    }`}
+                    type="button"
+                    onClick={() => {
+                      if (!isActive) {
+                        setSpeed(option);
+                      }
+                    }}
+                    aria-pressed={isActive}
+                  >
+                    {formatSpeedDisplay(option)}×
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
-        <button className="game-controls__advance" type="button" onClick={handleAdvanceNow}>
-          Advance now
-        </button>
         <button
           className="game-controls__chronicle"
           type="button"
@@ -725,28 +726,66 @@ export default function App() {
         ) : null}
       </main>
 
-      <footer className="game-hand" aria-label="Cards in hand">
-        <div className="game-hand__meta">
-          <h2>Hand</h2>
-          {selectedCard ? <span>Selected: {selectedCard.name}</span> : <span>Select a card to place.</span>}
-        </div>
-        <div
-          className={`game-hand__cards${draggedCardId ? ' game-hand__cards--droppable' : ''}`}
-          onDragOver={allowHandDrop}
-          onDrop={handleHandDrop}
-        >
-          {handCards.map((card) => (
-            <CardView
-              key={card.id}
-              card={card}
-              selected={selectedCardId === card.id}
-              onSelect={handleCardSelect}
-              draggable
-              onDragStart={handleCardDragStart}
-              onDragEnd={handleCardDragEnd}
-              timing={timingContext}
-            />
-          ))}
+      <footer className={`game-hand${isHandOpen ? ' game-hand--open' : ''}`} aria-label="Cards in hand">
+        <div className="game-hand__surface">
+          <button
+            type="button"
+            className="game-hand__toggle"
+            aria-expanded={isHandOpen}
+            aria-controls={handPanelId}
+            onClick={() => setIsHandOpen((prev) => !prev)}
+          >
+            <span className="game-hand__toggle-title">Hand</span>
+            <span className="game-hand__toggle-meta">
+              {handCards.length} card{handCards.length === 1 ? '' : 's'}
+            </span>
+            <span className="game-hand__toggle-icon" aria-hidden="true">
+              {isHandOpen ? '▾' : '▴'}
+            </span>
+          </button>
+          <div
+            id={handPanelId}
+            className="game-hand__panel"
+            aria-hidden={!isHandOpen}
+          >
+            <div className="game-hand__meta">
+              <div className="game-hand__meta-text">
+                <h2>
+                  Hand
+                  <span className="game-hand__meta-count">
+                    · {handCards.length} card{handCards.length === 1 ? '' : 's'}
+                  </span>
+                </h2>
+                <p>{selectedCard ? `Selected: ${selectedCard.name}` : 'Select a card to place.'}</p>
+              </div>
+              <button
+                type="button"
+                className="game-hand__collapse"
+                onClick={() => setIsHandOpen(false)}
+              >
+                <span className="sr-only">Close hand</span>
+                <span aria-hidden="true">⌄</span>
+              </button>
+            </div>
+            <div
+              className={`game-hand__cards${draggedCardId ? ' game-hand__cards--droppable' : ''}`}
+              onDragOver={allowHandDrop}
+              onDrop={handleHandDrop}
+            >
+              {handCards.map((card) => (
+                <CardView
+                  key={card.id}
+                  card={card}
+                  selected={selectedCardId === card.id}
+                  onSelect={handleCardSelect}
+                  draggable
+                  onDragStart={handleCardDragStart}
+                  onDragEnd={handleCardDragEnd}
+                  timing={timingContext}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </footer>
 

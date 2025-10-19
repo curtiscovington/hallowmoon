@@ -40,7 +40,8 @@ These guidelines capture the shared visual and interaction language for the Hall
 ## Component Patterns
 - **Header bars:** Split resource and control clusters. On mobile, collapse secondary clusters (settings, speed) into drawers or sticky footers.
 - **Cards:** Use 12 px corner radius, 16 px internal padding, and a dedicated footer row for meta (duration, traits). Limit live text length to two lines before truncation.
-- **Drawers & sheets:** Slide from edge corresponding to their context (chronicle/log from right on desktop, bottom on mobile). Provide a drag handle and close button.
+- **Drawers & sheets:** Slide from edge corresponding to their context (chronicle/log from right on desktop, bottom on mobile). Provide a drag handle and close button. The player hand remains docked as a bottom drawer anchored to the viewport edge: keep the toggle pill visible when closed for instant reopening, and expose an inline close control when expanded.
+- **Time controls:** Keep the floating timer bar to a single row. Pair a pause/resume icon button with inline speed chips, and avoid manual "advance" actions beyond unpausing.
 - **Buttons & chips:** Primary buttons carry solid fill and drop shadow; secondary/tertiary use ghost or outline styles. Chips display icon + label; wrap overflow with ellipsis rather than stacking.
 - **Timers:** Present both countdown text and visual progress when an action can expire. Freeze progress bars when time is paused.
 
