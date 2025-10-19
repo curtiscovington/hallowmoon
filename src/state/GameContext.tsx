@@ -47,6 +47,18 @@ interface SlotTemplate {
   repair?: { targetKey: string; time: number };
 }
 
+const SLOT_LOCK_BASE_MS = 60000;
+
+const SLOT_LOCK_DURATIONS: Record<SlotType, number> = {
+  hearth: SLOT_LOCK_BASE_MS,
+  work: SLOT_LOCK_BASE_MS * 2,
+  study: Math.round(SLOT_LOCK_BASE_MS * 1.5),
+  ritual: SLOT_LOCK_BASE_MS * 3,
+  expedition: SLOT_LOCK_BASE_MS * 4,
+  manor: SLOT_LOCK_BASE_MS,
+  bedroom: Math.round(SLOT_LOCK_BASE_MS * 1.5)
+};
+
 const HERO_TEMPLATE: CardTemplate = {
   key: 'persona-initiate',
   name: 'Initiate of the Veiled Star',
@@ -178,7 +190,7 @@ const SLOT_TEMPLATES: Record<string, SlotTemplate> = {
     name: 'Ruined Sanctum',
     type: 'manor',
     description:
-      'Broken mirrors and dust-clogged braziers mute the sanctum. A persona could clear it in two cycles.',
+      'Broken mirrors and dust-clogged braziers mute the sanctum. A persona could clear it with a few focused shifts.',
     traits: ['damaged', 'haven'],
     accepted: 'persona-only',
     upgradeCost: 0,
@@ -230,7 +242,7 @@ const SLOT_TEMPLATES: Record<string, SlotTemplate> = {
     name: 'Ruined Bedroom',
     type: 'manor',
     description:
-      'Mattresses are mouldering and windows broken. Two cycles of care will make it fit for dreaming.',
+      'Mattresses are mouldering and windows broken. Careful effort will make it fit for dreaming again.',
     traits: ['damaged', 'dream'],
     accepted: 'persona-only',
     upgradeCost: 0,
@@ -283,8 +295,33 @@ function instantiateSlot(template: SlotTemplate, id?: string): Slot {
     unlocked: template.unlocked ?? true,
     state: template.state ?? 'active',
     repair,
-    repairStarted: false
+    repairStarted: false,
+    lockedUntil: null
   };
+}
+
+function formatDurationLabel(ms: number): string {
+  const clamped = Math.max(0, ms);
+  if (clamped >= 60000) {
+    const minutes = Math.floor(clamped / 60000);
+    const seconds = Math.round((clamped % 60000) / 1000);
+    if (seconds === 0) {
+      return `${minutes}m`;
+    }
+    return `${minutes}m ${seconds}s`;
+  }
+  if (clamped >= 1000) {
+    return `${Math.round(clamped / 1000)}s`;
+  }
+  return `${clamped}ms`;
+}
+
+function getSlotLockDurationMs(slot: Slot): number {
+  const base = SLOT_LOCK_DURATIONS[slot.type] ?? SLOT_LOCK_BASE_MS;
+  if (slot.type === 'manor' && slot.state === 'damaged') {
+    return base * 2;
+  }
+  return base;
 }
 
 const MANOR_ROOM_TEMPLATE_KEYS = [
@@ -380,6 +417,12 @@ type Action =
   | { type: 'ACTIVATE_SLOT'; slotId: string }
   | { type: 'UPGRADE_SLOT'; slotId: string }
   | { type: 'ADVANCE_TIME' };
+
+interface SlotActionResult {
+  state: GameState;
+  log: string[];
+  performed: boolean;
+}
 
 function appendLog(log: string[], message: string): string[] {
   const next = [message, ...log];
@@ -486,16 +529,17 @@ function spawnOpportunity(state: GameState, log: string[]): {
   return { state: nextState, log: nextLog };
 }
 
-function workHearth(state: GameState, slot: Slot, log: string[]): { state: GameState; log: string[] } {
+function workHearth(state: GameState, slot: Slot, log: string[]): SlotActionResult {
   if (!slot.occupantId) {
-    return { state, log: appendLog(log, 'The sanctum waits for someone to rest within it.') };
+    return { state, log: appendLog(log, 'The sanctum waits for someone to rest within it.'), performed: false };
   }
 
   const card = state.cards[slot.occupantId];
   if (!card || card.type !== 'persona') {
     return {
       state,
-      log: appendLog(log, 'Only a living persona can draw the sanctum’s calm.')
+      log: appendLog(log, 'Only a living persona can draw the sanctum’s calm.'),
+      performed: false
     };
   }
 
@@ -522,19 +566,25 @@ function workHearth(state: GameState, slot: Slot, log: string[]): { state: GameS
       ...state,
       resources: nextResources
     },
-    log: nextLog
+    log: nextLog,
+    performed: true
   };
 }
 
-function workJob(state: GameState, slot: Slot, log: string[]): { state: GameState; log: string[] } {
+function workJob(state: GameState, slot: Slot, log: string[]): SlotActionResult {
   if (!slot.occupantId) {
-    return { state, log: appendLog(log, 'Assign your persona to the job before attempting to work it.') };
+    return {
+      state,
+      log: appendLog(log, 'Assign your persona to the job before attempting to work it.'),
+      performed: false
+    };
   }
   const card = state.cards[slot.occupantId];
   if (!card || card.type !== 'persona') {
     return {
       state,
-      log: appendLog(log, 'Only a persona can interpret the ledgers of the scriptorium.')
+      log: appendLog(log, 'Only a persona can interpret the ledgers of the scriptorium.'),
+      performed: false
     };
   }
 
@@ -557,7 +607,7 @@ function workJob(state: GameState, slot: Slot, log: string[]): { state: GameStat
       { ...state, resources: nextResources },
       nextLog
     );
-    return { state: spawnedState, log: spawnedLog };
+    return { state: spawnedState, log: spawnedLog, performed: true };
   }
 
   return {
@@ -565,18 +615,23 @@ function workJob(state: GameState, slot: Slot, log: string[]): { state: GameStat
       ...state,
       resources: nextResources
     },
-    log: nextLog
+    log: nextLog,
+    performed: true
   };
 }
 
-function exploreManor(state: GameState, slot: Slot, log: string[]): { state: GameState; log: string[] } {
+function exploreManor(state: GameState, slot: Slot, log: string[]): SlotActionResult {
   if (!slot.occupantId) {
-    return { state, log: appendLog(log, 'Send a persona into the manor before attempting to explore it.') };
+    return {
+      state,
+      log: appendLog(log, 'Send a persona into the manor before attempting to explore it.'),
+      performed: false
+    };
   }
 
   const persona = state.cards[slot.occupantId];
   if (!persona || persona.type !== 'persona') {
-    return { state, log: appendLog(log, 'Only a living persona can unveil the manor’s halls.') };
+    return { state, log: appendLog(log, 'Only a living persona can unveil the manor’s halls.'), performed: false };
   }
 
   const missingKeys: ManorRoomTemplateKey[] = MANOR_ROOM_TEMPLATE_KEYS.filter((templateKey) => {
@@ -590,7 +645,8 @@ function exploreManor(state: GameState, slot: Slot, log: string[]): { state: Gam
   if (missingKeys.length === 0) {
     return {
       state,
-      log: appendLog(log, 'The manor is quiet for now; every discovered room awaits restoration.')
+      log: appendLog(log, 'The manor is quiet for now; every discovered room awaits restoration.'),
+      performed: false
     };
   }
 
@@ -615,34 +671,38 @@ function exploreManor(state: GameState, slot: Slot, log: string[]): { state: Gam
     `${persona.name} charts the manor’s halls, revealing ${roomsFragment}.`
   );
 
-  return { state: nextState, log: nextLog };
+  return { state: nextState, log: nextLog, performed: true };
 }
 
-function repairManorRoom(state: GameState, slot: Slot, log: string[]): { state: GameState; log: string[] } {
+function repairManorRoom(state: GameState, slot: Slot, log: string[]): SlotActionResult {
   if (!slot.repair) {
-    return { state, log };
+    return { state, log, performed: false };
   }
 
   if (!slot.occupantId) {
-    return { state, log: appendLog(log, 'Assign a persona to clear the debris from this room.') };
+    return {
+      state,
+      log: appendLog(log, 'Assign a persona to clear the debris from this room.'),
+      performed: false
+    };
   }
 
   const persona = state.cards[slot.occupantId];
   if (!persona || persona.type !== 'persona') {
-    return { state, log: appendLog(log, 'A persona must brave the dust and cobwebs to restore the room.') };
+    return {
+      state,
+      log: appendLog(log, 'A persona must brave the dust and cobwebs to restore the room.'),
+      performed: false
+    };
   }
 
-  const cyclesRemaining = slot.repair.remaining;
+  const remainingMs = slot.repair.remaining * SLOT_LOCK_BASE_MS;
   const message = slot.repairStarted
-    ? `${persona.name} continues restoring ${slot.name}. ${cyclesRemaining} cycle${
-        cyclesRemaining === 1 ? '' : 's'
-      } remain.`
-    : `${persona.name} begins restoring ${slot.name}. ${cyclesRemaining} cycle${
-        cyclesRemaining === 1 ? '' : 's'
-      } remain.`;
+    ? `${persona.name} continues restoring ${slot.name}. ≈ ${formatDurationLabel(remainingMs)} remain.`
+    : `${persona.name} begins restoring ${slot.name}. ≈ ${formatDurationLabel(remainingMs)} remain.`;
 
   if (slot.repairStarted) {
-    return { state, log: appendLog(log, message) };
+    return { state, log: appendLog(log, message), performed: false };
   }
 
   const updatedSlots = {
@@ -658,18 +718,19 @@ function repairManorRoom(state: GameState, slot: Slot, log: string[]): { state: 
       ...state,
       slots: updatedSlots
     },
-    log: appendLog(log, message)
+    log: appendLog(log, message),
+    performed: true
   };
 }
 
-function bedroomSlot(state: GameState, slot: Slot, log: string[]): { state: GameState; log: string[] } {
+function bedroomSlot(state: GameState, slot: Slot, log: string[]): SlotActionResult {
   if (!slot.occupantId) {
-    return { state, log: appendLog(log, 'Let a persona rest within the bedroom to invite a dream.') };
+    return { state, log: appendLog(log, 'Let a persona rest within the bedroom to invite a dream.'), performed: false };
   }
 
   const persona = state.cards[slot.occupantId];
   if (!persona || persona.type !== 'persona') {
-    return { state, log: appendLog(log, 'Only a persona may slumber deeply enough to dream here.') };
+    return { state, log: appendLog(log, 'Only a persona may slumber deeply enough to dream here.'), performed: false };
   }
 
   const dream = createDreamCard();
@@ -688,17 +749,17 @@ function bedroomSlot(state: GameState, slot: Slot, log: string[]): { state: Game
     `${persona.name} slumbers in ${slot.name}, awakening with ${dream.name}.`
   );
 
-  return { state: nextState, log: nextLog };
+  return { state: nextState, log: nextLog, performed: true };
 }
 
-function studySlot(state: GameState, slot: Slot, log: string[]): { state: GameState; log: string[] } {
+function studySlot(state: GameState, slot: Slot, log: string[]): SlotActionResult {
   if (!slot.occupantId) {
-    return { state, log: appendLog(log, 'Place a card upon the Night Archive to study it.') };
+    return { state, log: appendLog(log, 'Place a card upon the Night Archive to study it.'), performed: false };
   }
 
   const card = state.cards[slot.occupantId];
   if (!card) {
-    return { state, log };
+    return { state, log, performed: false };
   }
 
   const assistant = slot.assistantId ? state.cards[slot.assistantId] ?? null : null;
@@ -733,7 +794,8 @@ function studySlot(state: GameState, slot: Slot, log: string[]): { state: GameSt
         slots: updatedSlots,
         hand: updatedHand
       },
-      log: nextLog
+      log: nextLog,
+      performed: true
     };
   }
 
@@ -745,7 +807,8 @@ function studySlot(state: GameState, slot: Slot, log: string[]): { state: GameSt
         ...state,
         resources: nextResources
       },
-      log: appendLog(log, `${card.name} reflects upon their path, gaining ${loreGain} lore.`)
+      log: appendLog(log, `${card.name} reflects upon their path, gaining ${loreGain} lore.`),
+      performed: true
     };
   }
 
@@ -789,19 +852,21 @@ function studySlot(state: GameState, slot: Slot, log: string[]): { state: GameSt
       cards: updatedCards,
       hand: removeFromHand(nextState.hand, card.id)
     },
-    log: nextLog
+    log: nextLog,
+    performed: true
   };
 }
 
-function ritualSlot(state: GameState, slot: Slot, log: string[]): { state: GameState; log: string[] } {
+function ritualSlot(state: GameState, slot: Slot, log: string[]): SlotActionResult {
   if (!slot.occupantId) {
-    return { state, log: appendLog(log, 'Seat your persona within the circle to conduct a rite.') };
+    return { state, log: appendLog(log, 'Seat your persona within the circle to conduct a rite.'), performed: false };
   }
   const card = state.cards[slot.occupantId];
   if (!card || card.type !== 'persona') {
     return {
       state,
-      log: appendLog(log, 'A living persona must anchor the ritual.')
+      log: appendLog(log, 'A living persona must anchor the ritual.'),
+      performed: false
     };
   }
 
@@ -809,7 +874,8 @@ function ritualSlot(state: GameState, slot: Slot, log: string[]): { state: GameS
   if (state.resources.lore < loreCost) {
     return {
       state,
-      log: appendLog(log, `You require ${loreCost} lore to empower the ritual.`)
+      log: appendLog(log, `You require ${loreCost} lore to empower the ritual.`),
+      performed: false
     };
   }
 
@@ -829,7 +895,7 @@ function ritualSlot(state: GameState, slot: Slot, log: string[]): { state: GameS
       { ...state, resources: nextResources },
       nextLog
     );
-    return { state: spawnedState, log: spawnedLog };
+    return { state: spawnedState, log: spawnedLog, performed: true };
   }
 
   return {
@@ -837,24 +903,26 @@ function ritualSlot(state: GameState, slot: Slot, log: string[]): { state: GameS
       ...state,
       resources: nextResources
     },
-    log: nextLog
+    log: nextLog,
+    performed: true
   };
 }
 
-function expeditionSlot(state: GameState, slot: Slot, log: string[]): { state: GameState; log: string[] } {
+function expeditionSlot(state: GameState, slot: Slot, log: string[]): SlotActionResult {
   if (!slot.occupantId) {
-    return { state, log: appendLog(log, 'A daring persona must step through the Umbral Gate.') };
+    return { state, log: appendLog(log, 'A daring persona must step through the Umbral Gate.'), performed: false };
   }
   const card = state.cards[slot.occupantId];
   if (!card || card.type !== 'persona') {
-    return { state, log: appendLog(log, 'Only your persona can brave the Umbral Gate.') };
+    return { state, log: appendLog(log, 'Only your persona can brave the Umbral Gate.'), performed: false };
   }
 
   const glimmerCost = 1;
   if (state.resources.glimmer < glimmerCost) {
     return {
       state,
-      log: appendLog(log, 'At least 1 glimmer is needed to light the path beyond the gate.')
+      log: appendLog(log, 'At least 1 glimmer is needed to light the path beyond the gate.'),
+      performed: false
     };
   }
 
@@ -881,38 +949,87 @@ function expeditionSlot(state: GameState, slot: Slot, log: string[]): { state: G
     nextLog = spawnedLog;
   }
 
-  return { state: nextState, log: nextLog };
+  return { state: nextState, log: nextLog, performed: true };
 }
 
-function activateSlot(state: GameState, slotId: string): { state: GameState; log: string[] } {
+function activateSlot(state: GameState, slotId: string): SlotActionResult {
   const slot = state.slots[slotId];
   if (!slot || !slot.unlocked) {
-    return { state, log: appendLog(state.log, 'That slot is not yet available.') };
+    return { state, log: appendLog(state.log, 'That slot is not yet available.'), performed: false };
+  }
+
+  const now = Date.now();
+  if (slot.lockedUntil && slot.lockedUntil > now) {
+    const remaining = slot.lockedUntil - now;
+    const message = `${slot.name} is still resolving a previous action. ≈ ${formatDurationLabel(remaining)} remain.`;
+    return { state, log: appendLog(state.log, message), performed: false };
   }
 
   const log = state.log;
 
+  let result: SlotActionResult;
+
   switch (slot.type) {
     case 'hearth':
-      return workHearth(state, slot, log);
+      result = workHearth(state, slot, log);
+      break;
     case 'work':
-      return workJob(state, slot, log);
+      result = workJob(state, slot, log);
+      break;
     case 'study':
-      return studySlot(state, slot, log);
+      result = studySlot(state, slot, log);
+      break;
     case 'ritual':
-      return ritualSlot(state, slot, log);
+      result = ritualSlot(state, slot, log);
+      break;
     case 'expedition':
-      return expeditionSlot(state, slot, log);
+      result = expeditionSlot(state, slot, log);
+      break;
     case 'manor':
       if (slot.state === 'damaged' && slot.repair) {
-        return repairManorRoom(state, slot, log);
+        result = repairManorRoom(state, slot, log);
+      } else {
+        result = exploreManor(state, slot, log);
       }
-      return exploreManor(state, slot, log);
+      break;
     case 'bedroom':
-      return bedroomSlot(state, slot, log);
+      result = bedroomSlot(state, slot, log);
+      break;
     default:
-      return { state, log };
+      result = { state, log, performed: false };
   }
+
+  if (!result.performed) {
+    return result;
+  }
+
+  const refreshedSlot = result.state.slots[slotId];
+  if (!refreshedSlot) {
+    return result;
+  }
+
+  const lockDuration = getSlotLockDurationMs(refreshedSlot);
+  const lockedSlot: Slot = {
+    ...refreshedSlot,
+    lockedUntil: Date.now() + lockDuration
+  };
+
+  const updatedSlots = {
+    ...result.state.slots,
+    [slotId]: lockedSlot
+  };
+
+  const nextState: GameState = {
+    ...result.state,
+    slots: updatedSlots
+  };
+
+  const nextLog = appendLog(
+    result.log,
+    `${lockedSlot.name} will be ready again in about ${formatDurationLabel(lockDuration)}.`
+  );
+
+  return { state: nextState, log: nextLog, performed: true };
 }
 
 function gameReducer(state: GameState, action: Action): GameState {
@@ -1180,7 +1297,7 @@ function gameReducer(state: GameState, action: Action): GameState {
       let updatedCards = { ...state.cards };
       let updatedSlots = { ...state.slots };
       let updatedHand = [...state.hand];
-      let updatedLog = appendLog(state.log, `The candle gutters as cycle ${state.cycle + 1} begins.`);
+      let updatedLog = appendLog(state.log, 'The candle gutters as time presses onward.');
 
       for (const card of Object.values(state.cards)) {
         if (card.permanent || card.location.area === 'lost') {
@@ -1281,11 +1398,10 @@ function gameReducer(state: GameState, action: Action): GameState {
                 }
               }
             };
+            const remainingMs = remaining * SLOT_LOCK_BASE_MS;
             updatedLog = appendLog(
               updatedLog,
-              `${occupant.name} makes progress restoring ${slot.name}. ${remaining} cycle${
-                remaining === 1 ? '' : 's'
-              } remain.`
+              `${occupant.name} makes progress restoring ${slot.name}. ≈ ${formatDurationLabel(remainingMs)} remain.`
             );
           }
         }

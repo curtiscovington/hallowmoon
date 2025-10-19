@@ -13,7 +13,7 @@ These guidelines capture the shared visual and interaction language for the Hall
 - Maintain WCAG 2.1 AA contrast (4.5:1 for body text, 3:1 for large text/icons). Validate new palettes against both light and dark themes if offered.
 - Base body text at 16 px (1 rem) minimum. Interactive labels (buttons, chips, timers) must reach 15 px (0.94 rem) or larger.
 - Ensure tap targets are at least 44 px × 44 px and include a focused/active state for keyboard users.
-- Announce time-based events (`aria-live="polite"`) only when they materially affect the user’s decisions; avoid noisy announcements every cycle tick.
+- Announce time-based events (`aria-live="polite"`) only when they materially affect the user’s decisions; avoid noisy announcements every hidden time pulse.
 - All motion must respect the `prefers-reduced-motion` media query. Provide non-animated fallbacks for critical affordances.
 
 ## Layout & Spacing
@@ -48,7 +48,7 @@ These guidelines capture the shared visual and interaction language for the Hall
 
 ## Interaction Patterns
 - Highlight drag sources with a shadow and scale (max 1.02). Drop targets should glow subtly once a compatible item hovers.
-- Provide haptic-friendly cues: on mobile, align audio or vibration with significant events (cycle completion, card unlock).
+- Provide haptic-friendly cues: on mobile, align audio or vibration with significant events (interval completion, card unlock).
 - Use optimistic UI updates for card assignments and slot upgrades, rolling back only when persistence fails.
 - Surface destructive actions with confirmation dialogs and a secondary escape route (e.g., swipe to cancel).
 

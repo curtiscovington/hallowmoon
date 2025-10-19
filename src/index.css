@@ -98,7 +98,7 @@ body {
   justify-content: space-between;
 }
 
-.game-header__cycle {
+.game-header__cadence {
   display: grid;
   gap: 0.15rem;
   font-size: 0.95rem;
@@ -108,13 +108,13 @@ body {
   border: 1px solid rgba(164, 140, 255, 0.35);
 }
 
-.game-header__cycle-label {
+.game-header__cadence-label {
   font-size: 0.78rem;
   color: #d5ccff;
   letter-spacing: 0.04em;
 }
 
-.game-header__cycle-value {
+.game-header__cadence-value {
   font-size: 1.1rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -217,6 +217,11 @@ body {
 
 .slot-card--locked {
   opacity: 0.65;
+}
+
+.slot-card--busy {
+  border-color: rgba(245, 186, 121, 0.4);
+  box-shadow: 0 0 0 2px rgba(245, 186, 121, 0.18);
 }
 
 .slot-card--active {
@@ -346,6 +351,12 @@ body {
   box-shadow: inset 0 0 0 1px rgba(56, 42, 12, 0.2);
 }
 
+.slot-card__timer--busy {
+  color: #f6c28b;
+  background: rgba(246, 194, 139, 0.2);
+  border-color: rgba(246, 194, 139, 0.35);
+}
+
 .slot-card__timer--paused {
   color: #cbbff7;
   background: rgba(121, 104, 214, 0.18);
@@ -411,6 +422,12 @@ body {
 .slot-card__dropzone--locked {
   border-color: rgba(104, 96, 148, 0.45);
   background: rgba(58, 49, 98, 0.32);
+}
+
+.slot-card__dropzone--busy {
+  border-color: rgba(245, 186, 121, 0.45);
+  background: rgba(84, 63, 122, 0.32);
+  cursor: not-allowed;
 }
 
 .slot-card__dropzone--occupied {
@@ -874,12 +891,6 @@ body {
 
 .card-token__footer-row--traits {
   color: #d0c8ff;
-}
-
-.card-token__timer {
-  color: #fbdc9b;
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 .resource-track {
