@@ -1081,6 +1081,144 @@ body {
   border-radius: 3px;
 }
 
+.slot-reveal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  pointer-events: auto;
+}
+
+.slot-reveal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 6, 22, 0.78);
+  backdrop-filter: blur(18px);
+  opacity: 1;
+  transition: opacity 220ms ease;
+}
+
+.slot-reveal--closing .slot-reveal__backdrop {
+  opacity: 0;
+}
+
+.slot-reveal__content {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: min(90vw, 420px);
+  padding: clamp(1.2rem, 4vw, 1.8rem);
+  pointer-events: none;
+}
+
+.slot-reveal__card {
+  --slot-reveal-translate-x: 0px;
+  --slot-reveal-translate-y: 0px;
+  --slot-reveal-scale-x: 0.72;
+  --slot-reveal-scale-y: 0.72;
+  position: relative;
+  pointer-events: auto;
+  width: 100%;
+  background: linear-gradient(185deg, rgba(38, 28, 64, 0.92), rgba(16, 11, 30, 0.96));
+  border-radius: 1.35rem;
+  border: 1px solid rgba(167, 148, 255, 0.5);
+  box-shadow: 0 24px 54px rgba(4, 2, 12, 0.65);
+  padding: clamp(1.5rem, 4vw, 2.1rem);
+  display: grid;
+  gap: 0.9rem;
+  text-align: center;
+  transform: translate3d(0, 0, 0) scale(1);
+  opacity: 1;
+  transition: transform 360ms cubic-bezier(0.17, 0.89, 0.36, 1), opacity 240ms ease;
+  animation: slot-reveal-pop 260ms ease-out;
+}
+
+.slot-reveal__card--outro {
+  transform: translate3d(var(--slot-reveal-translate-x), var(--slot-reveal-translate-y), 0)
+    scale(var(--slot-reveal-scale-x), var(--slot-reveal-scale-y));
+  opacity: 0;
+}
+
+.slot-reveal__type {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(212, 200, 255, 0.8);
+}
+
+.slot-reveal__type-icon {
+  font-size: 1.1rem;
+}
+
+.slot-reveal__name {
+  margin: 0;
+  font-size: clamp(1.4rem, 4vw, 1.9rem);
+  letter-spacing: 0.06em;
+}
+
+.slot-reveal__description {
+  margin: 0;
+  font-size: 1rem;
+  color: rgba(235, 229, 255, 0.88);
+}
+
+.slot-reveal__button {
+  justify-self: center;
+  padding: 0.7rem 1.6rem;
+  border-radius: 999px;
+  background: rgba(177, 160, 255, 0.85);
+  border: 1px solid rgba(214, 204, 255, 0.9);
+  color: #140a30;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.slot-reveal__button:hover,
+.slot-reveal__button:focus-visible {
+  background: rgba(214, 204, 255, 0.95);
+  box-shadow: 0 16px 32px rgba(44, 26, 88, 0.35);
+  transform: translateY(-1px);
+}
+
+.slot-reveal__button:focus-visible {
+  outline: 2px solid rgba(255, 240, 186, 0.85);
+  outline-offset: 2px;
+}
+
+@keyframes slot-reveal-pop {
+  from {
+    transform: scale(0.82);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-reveal__backdrop,
+  .slot-reveal__card,
+  .slot-reveal__button {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .slot-reveal__card--outro {
+    transform: none;
+  }
+}
+
 [data-collapsed='true'] .slot-card__description {
   display: none;
 }
