@@ -1,4 +1,14 @@
-import { DragEvent, ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  CSSProperties,
+  DragEvent,
+  KeyboardEvent,
+  ReactNode,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import { useGame } from './state/GameContext';
 import { CardInstance, Slot } from './state/types';
 import { SLOT_TYPE_INFO } from './constants/slotTypeInfo';
@@ -198,6 +208,8 @@ function SlotView({
   assistant,
   attachments,
   isHeroInSlot,
+  hasSelectedCard,
+  selectedCardName,
   onClick,
   onActivate,
   onUpgrade,
@@ -214,6 +226,8 @@ function SlotView({
   assistant: CardInstance | null;
   attachments: CardInstance[];
   isHeroInSlot: boolean;
+  hasSelectedCard: boolean;
+  selectedCardName: string | null;
   onClick: (slotId: string) => void;
   onActivate: (slotId: string) => void;
   onUpgrade: (slotId: string) => void;
@@ -262,6 +276,9 @@ function SlotView({
   }
   if (isDragOver && isSlotInteractive) {
     slotClasses.push('slot-card--active');
+  }
+  if (isDragOver && isSlotInteractive) {
+    slotClasses.push('slot-card--drop-target');
   }
   if (!showDetails) {
     slotClasses.push('slot-card--collapsed');
@@ -334,7 +351,7 @@ function SlotView({
     return event.dataTransfer?.types.includes(CARD_DRAG_TYPE) ?? false;
   }
 
-  function handleDragEnter(event: DragEvent<HTMLButtonElement>) {
+  function handleDragEnter(event: DragEvent<HTMLElement>) {
     if (!isSlotInteractive || !acceptsCard(event)) {
       return;
     }
@@ -342,7 +359,7 @@ function SlotView({
     setIsDragOver(true);
   }
 
-  function handleDragOver(event: DragEvent<HTMLButtonElement>) {
+  function handleDragOver(event: DragEvent<HTMLElement>) {
     if (!isSlotInteractive || !acceptsCard(event)) {
       return;
     }
@@ -350,7 +367,7 @@ function SlotView({
     event.dataTransfer.dropEffect = 'move';
   }
 
-  function handleDragLeave(event: DragEvent<HTMLButtonElement>) {
+  function handleDragLeave(event: DragEvent<HTMLElement>) {
     if (!isSlotInteractive) {
       return;
     }
@@ -361,7 +378,7 @@ function SlotView({
     setIsDragOver(false);
   }
 
-  function handleDrop(event: DragEvent<HTMLButtonElement>) {
+  function handleDrop(event: DragEvent<HTMLElement>) {
     if (!isSlotInteractive) {
       return;
     }
@@ -392,6 +409,42 @@ function SlotView({
   }
   if (isHeroInSlot) {
     dropzoneClasses.push('slot-card__dropzone--hero');
+  }
+
+  const stackSize = (occupant ? 1 : 0) + attachments.length;
+  const stackPreview = attachments.slice(-3);
+  const stackDescription =
+    stackSize > 0 && occupant
+      ? `${stackSize} card${stackSize === 1 ? '' : 's'}: ${[occupant.name, ...attachments.map((card) => card.name)].join(', ')}`
+      : null;
+
+  const dropzoneLabel = !isSlotInteractive
+    ? `${slot.name} is not accepting cards right now`
+    : hasSelectedCard
+    ? `Assign ${selectedCardName ?? 'selected card'} to ${slot.name}`
+    : occupant
+    ? `${getActivateLabel()} ${slot.name}`
+    : `Assign a card to ${slot.name}`;
+
+  function handlePrimaryClick() {
+    if (!isSlotInteractive) {
+      return;
+    }
+    if (hasSelectedCard) {
+      onClick(slot.id);
+      return;
+    }
+    if (occupant) {
+      onActivate(slot.id);
+    }
+  }
+
+  function handlePrimaryKey(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+    event.preventDefault();
+    handlePrimaryClick();
   }
 
   const detailActions: ReactNode[] = [];
@@ -429,6 +482,10 @@ function SlotView({
       data-collapsed={!showDetails}
       data-slot-type={slot.type}
       data-slot-id={slot.id}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <header className="slot-card__header">
         <div className="slot-card__title-block">
@@ -465,33 +522,47 @@ function SlotView({
       <button
         className={dropzoneClasses.join(' ')}
         type="button"
-        aria-label={`Assign a card to ${slot.name}`}
+        aria-label={dropzoneLabel}
         aria-disabled={!isSlotInteractive}
-        onClick={() => {
-          if (isSlotInteractive) {
-            onClick(slot.id);
-          }
-        }}
-        onDragEnter={handleDragEnter}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        data-has-occupant={Boolean(occupant)}
+        onClick={handlePrimaryClick}
+        onKeyDown={handlePrimaryKey}
       >
+        {stackDescription ? <span className="sr-only">{stackDescription}</span> : null}
         {occupant ? (
-          <CardView
-            card={occupant}
-            variant="slot"
-            draggable
-            timing={timing}
-            onDragStart={() => {
-              setIsDragOver(false);
-              onCardDragStart(occupant.id);
-            }}
-            onDragEnd={() => {
-              setIsDragOver(false);
-              onCardDragEnd();
-            }}
-          />
+          <div className={`slot-card__stack${attachments.length > 0 ? ' slot-card__stack--layered' : ''}`}>
+            {attachments.length > 0 ? (
+              <div className="slot-card__stack-layers" aria-hidden="true">
+                {stackPreview.map((card, index) => (
+                  <span
+                    key={card.id}
+                    className="slot-card__stack-layer"
+                    style={{ '--stack-index': stackPreview.length - index } as CSSProperties}
+                  />
+                ))}
+              </div>
+            ) : null}
+            <CardView
+              card={occupant}
+              variant="slot"
+              draggable
+              timing={timing}
+              onDragStart={() => {
+                setIsDragOver(false);
+                onCardDragStart(occupant.id);
+              }}
+              onDragEnd={() => {
+                setIsDragOver(false);
+                onCardDragEnd();
+              }}
+            />
+            <div className="slot-card__stack-label" aria-hidden="true">
+              <span className="slot-card__stack-label-action">{getActivateLabel()}</span>
+              {stackSize > 1 ? (
+                <span className="slot-card__stack-label-count">{stackSize} cards</span>
+              ) : null}
+            </div>
+          </div>
         ) : (
           <div className="slot-card__placeholder" aria-live="polite">
             <span className="slot-card__placeholder-title">
@@ -500,26 +571,26 @@ function SlotView({
             <span className="slot-card__placeholder-hint">Drop a compatible card here.</span>
           </div>
         )}
-        {attachments.length > 0 ? (
+      </button>
+      {occupantTraits ? <span className="slot-card__occupant-traits">{occupantTraits}</span> : null}
+      {attachments.length > 0 ? (
+        <div className="slot-card__stack-summary" aria-live="polite">
+          <span className="slot-card__stack-summary-title">Attached cards</span>
           <ul className="slot-card__attachments">
-            {attachments.map((card) => (
-              <li key={card.id} className="slot-card__attachment">
-                {card.name}
+            {attachments.map((card, index) => (
+              <li
+                key={card.id}
+                className="slot-card__attachment"
+                style={{ '--stack-index': attachments.length - index } as CSSProperties}
+              >
+                <span className="slot-card__attachment-name">{card.name}</span>
+                <span className="slot-card__attachment-meta">{card.type}</span>
               </li>
             ))}
           </ul>
-        ) : null}
-        {occupantTraits ? <span className="slot-card__occupant-traits">{occupantTraits}</span> : null}
-      </button>
+        </div>
+      ) : null}
       <div className="slot-card__cta" role="group" aria-label={`${slot.name} actions`}>
-        <button
-          className="slot-card__cta-button slot-card__cta-button--primary"
-          type="button"
-          onClick={() => onActivate(slot.id)}
-          disabled={!canActivate}
-        >
-          {getActivateLabel()}
-        </button>
         <button
           className="slot-card__cta-button slot-card__cta-button--secondary"
           type="button"
@@ -703,12 +774,6 @@ export default function App() {
   function handleCardDragStart(cardId: string) {
     setDraggedCardId(cardId);
     setSelectedCardId(null);
-    if (!isDesktop && isHandOpen) {
-      const card = state.cards[cardId];
-      if (card?.location.area === 'hand') {
-        setIsHandOpen(false);
-      }
-    }
   }
 
   function handleCardDragEnd() {
@@ -721,12 +786,18 @@ export default function App() {
     }
     moveCardToSlot(selectedCardId, slotId);
     setSelectedCardId(null);
+    if (!isDesktop) {
+      setIsHandOpen(false);
+    }
   }
 
   function handleSlotDrop(cardId: string, slotId: string) {
     moveCardToSlot(cardId, slotId);
     setDraggedCardId(null);
     setSelectedCardId(null);
+    if (!isDesktop) {
+      setIsHandOpen(false);
+    }
   }
 
   function handleHandDrop(event: DragEvent<HTMLDivElement>) {
@@ -883,6 +954,8 @@ export default function App() {
                 assistant={assistant}
                 attachments={attachments}
                 isHeroInSlot={isHeroInSlot}
+                hasSelectedCard={Boolean(selectedCard)}
+                selectedCardName={selectedCard?.name ?? null}
                 onClick={handleSlotClick}
                 onActivate={activateSlot}
                 onUpgrade={upgradeSlot}
