@@ -1107,6 +1107,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         return state;
       }
 
+      if (card.location.area === 'slot') {
+        const originSlot = state.slots[card.location.slotId];
+        if (originSlot && originSlot.lockedUntil && originSlot.lockedUntil > clockNow()) {
+          return {
+            ...state,
+            log: appendLog(
+              state.log,
+              `${card.name} is still committed to ${originSlot.name}. Wait for the action to resolve before moving them.`
+            )
+          };
+        }
+      }
+
       const updatedSlots: Record<string, Slot> = { ...state.slots };
       let updatedCards: Record<string, CardInstance> = { ...state.cards };
       let updatedHand = [...state.hand];
