@@ -519,6 +519,8 @@ function SlotView({
       ? `${stackSize} card${stackSize === 1 ? '' : 's'}: ${[occupant.name, ...attachments.map((card) => card.name)].join(', ')}`
       : null;
 
+  const canDragOccupant = slot.unlocked && !isSlotLocked;
+
   const dropzoneLabel = !isSlotInteractive
     ? `${slot.name} is not accepting cards right now`
     : hasSelectedCard
@@ -648,16 +650,24 @@ function SlotView({
             <CardView
               card={occupant}
               variant="slot"
-              draggable
+              draggable={canDragOccupant}
               timing={timing}
-              onDragStart={() => {
-                setIsDragOver(false);
-                onCardDragStart(occupant.id);
-              }}
-              onDragEnd={() => {
-                setIsDragOver(false);
-                onCardDragEnd();
-              }}
+              onDragStart={
+                canDragOccupant
+                  ? () => {
+                      setIsDragOver(false);
+                      onCardDragStart(occupant.id);
+                    }
+                  : undefined
+              }
+              onDragEnd={
+                canDragOccupant
+                  ? () => {
+                      setIsDragOver(false);
+                      onCardDragEnd();
+                    }
+                  : undefined
+              }
             />
             {shouldShowPrimaryAction || stackSize > 1 ? (
               <div className="slot-card__stack-label" aria-hidden="true">
