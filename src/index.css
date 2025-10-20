@@ -451,8 +451,80 @@ body {
 }
 
 .slot-card--drop-target {
-  box-shadow: 0 0 0 3px rgba(210, 197, 255, 0.45), 0 24px 44px rgba(16, 8, 36, 0.6);
-  transform: translateY(-2px);
+  border-color: rgba(233, 227, 255, 0.95);
+  box-shadow: 0 0 0 4px rgba(210, 197, 255, 0.55), 0 28px 54px rgba(16, 8, 36, 0.7);
+  transform: translateY(-3px);
+}
+
+.slot-card--drop-target::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 1.45rem;
+  background: radial-gradient(ellipse at top, rgba(210, 197, 255, 0.65), rgba(132, 110, 255, 0) 70%);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: -1;
+  animation: slot-card-drop-glow 840ms ease-in-out infinite alternate;
+}
+
+.slot-card--drop-target[data-slot-type='work']::before {
+  background: radial-gradient(ellipse at top, rgba(255, 200, 138, 0.7), rgba(255, 177, 108, 0) 72%);
+}
+
+.slot-card--drop-target[data-slot-type='study']::before {
+  background: radial-gradient(ellipse at top, rgba(168, 236, 255, 0.7), rgba(123, 209, 255, 0) 72%);
+}
+
+.slot-card--drop-target[data-slot-type='hearth']::before {
+  background: radial-gradient(ellipse at top, rgba(255, 181, 181, 0.68), rgba(255, 143, 143, 0) 72%);
+}
+
+.slot-card--drop-target[data-slot-type='ritual']::before {
+  background: radial-gradient(ellipse at top, rgba(224, 188, 255, 0.7), rgba(208, 158, 255, 0) 72%);
+}
+
+.slot-card--drop-target[data-slot-type='expedition']::before {
+  background: radial-gradient(ellipse at top, rgba(192, 255, 218, 0.68), rgba(164, 235, 195, 0) 72%);
+}
+
+.slot-card--drop-target .slot-card__dropzone {
+  border-color: rgba(233, 227, 255, 0.95);
+  background: rgba(210, 197, 255, 0.3);
+  box-shadow: inset 0 0 0 1px rgba(233, 227, 255, 0.6), 0 0 22px rgba(163, 140, 255, 0.45);
+}
+
+.slot-card--drop-target .slot-card__placeholder-hint,
+.slot-card--drop-target .slot-card__stack-label-action {
+  color: #f3edff;
+}
+
+.slot-card--drop-target .slot-card__stack-label-count {
+  color: rgba(243, 237, 255, 0.75);
+}
+
+@keyframes slot-card-drop-glow {
+  0% {
+    opacity: 0.35;
+    transform: scale(0.94);
+  }
+
+  55% {
+    opacity: 0.7;
+    transform: scale(0.98);
+  }
+
+  100% {
+    opacity: 0.35;
+    transform: scale(0.94);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-card--drop-target::before {
+    animation: none;
+    opacity: 0.45;
+  }
 }
 
 .slot-card__stack {
