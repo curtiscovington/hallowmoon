@@ -49,7 +49,9 @@ export interface SlotRepair {
 
 export type SlotAcceptance = 'persona-only' | 'non-persona' | 'any';
 
-export type PendingSlotAction = { type: 'explore-manor' };
+export type PendingSlotAction =
+  | { type: 'explore-manor' }
+  | { type: 'deliver-cards'; cardIds: string[]; reveal: boolean };
 
 export interface Slot {
   id: string;
@@ -69,6 +71,7 @@ export interface Slot {
   repairStarted: boolean;
   lockedUntil: number | null;
   pendingAction: PendingSlotAction | null;
+  attachedCardIds: string[];
 }
 
 export interface Discovery {
@@ -89,4 +92,5 @@ export interface GameState {
   log: string[];
   discoveries: Discovery[];
   timeScale: number;
+  pendingReveals: string[];
 }

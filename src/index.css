@@ -470,6 +470,26 @@ body {
   letter-spacing: 0.08em;
 }
 
+.slot-card__attachments {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: center;
+}
+
+.slot-card__attachment {
+  background: rgba(26, 18, 54, 0.7);
+  border: 1px solid rgba(176, 158, 255, 0.35);
+  border-radius: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: #f1ebff;
+}
+
 .slot-card--collapsed {
   gap: 0.65rem;
 }
@@ -1229,4 +1249,121 @@ body {
 
 button {
   font-family: inherit;
+}
+
+.card-reveal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 210;
+  pointer-events: auto;
+}
+
+.card-reveal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 6, 22, 0.8);
+  backdrop-filter: blur(18px);
+  opacity: 1;
+  transition: opacity 220ms ease;
+}
+
+.card-reveal--closing .card-reveal__backdrop {
+  opacity: 0;
+}
+
+.card-reveal__content {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: min(90vw, 380px);
+  padding: clamp(1.2rem, 4vw, 1.8rem);
+  pointer-events: none;
+}
+
+.card-reveal__card {
+  position: relative;
+  pointer-events: auto;
+  width: 100%;
+  background: linear-gradient(190deg, rgba(40, 26, 70, 0.94), rgba(18, 10, 32, 0.98));
+  border-radius: 1.35rem;
+  border: 1px solid rgba(180, 162, 255, 0.5);
+  box-shadow: 0 24px 54px rgba(6, 3, 14, 0.65);
+  padding: clamp(1.5rem, 4vw, 2rem);
+  display: grid;
+  gap: 0.85rem;
+  text-align: center;
+  transform: translate3d(0, 0, 0) scale(1);
+  opacity: 1;
+  transition: transform 320ms cubic-bezier(0.17, 0.89, 0.36, 1), opacity 220ms ease;
+  animation: slot-reveal-pop 240ms ease-out;
+}
+
+.card-reveal__card--outro {
+  transform: translate3d(0, 12px, 0) scale(0.86);
+  opacity: 0;
+}
+
+.card-reveal__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(212, 200, 255, 0.8);
+}
+
+.card-reveal__tag {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 204, 255, 0.4);
+  background: rgba(34, 22, 64, 0.4);
+}
+
+.card-reveal__name {
+  margin: 0;
+  font-size: clamp(1.3rem, 4vw, 1.8rem);
+  letter-spacing: 0.05em;
+}
+
+.card-reveal__description {
+  margin: 0;
+  font-size: 1rem;
+  color: rgba(235, 229, 255, 0.88);
+}
+
+.card-reveal__traits {
+  margin: 0;
+  font-size: 0.9rem;
+  color: rgba(214, 203, 255, 0.75);
+}
+
+.card-reveal__button {
+  justify-self: center;
+  padding: 0.7rem 1.6rem;
+  border-radius: 999px;
+  background: rgba(177, 160, 255, 0.88);
+  border: 1px solid rgba(214, 204, 255, 0.9);
+  color: #140a30;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.card-reveal__button:hover,
+.card-reveal__button:focus-visible {
+  background: rgba(214, 204, 255, 0.95);
+  box-shadow: 0 16px 32px rgba(44, 26, 88, 0.35);
+  transform: translateY(-1px);
+}
+
+.card-reveal__button:focus-visible {
+  outline: 2px solid rgba(255, 240, 186, 0.85);
+  outline-offset: 2px;
 }
