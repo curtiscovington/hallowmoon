@@ -10,17 +10,26 @@ import {
   useState
 } from 'react';
 import { useGame } from './state/GameContext';
-import { CardInstance, Slot } from './state/types';
+import { CardInstance, Resources, Slot } from './state/types';
 import { SLOT_TYPE_INFO } from './constants/slotTypeInfo';
 import { SlotRevealOverlay } from './components/SlotRevealOverlay';
 import { CardRevealOverlay } from './components/CardRevealOverlay';
 import { formatDuration } from './utils/time';
+import { SLOT_TEMPLATES } from './state/content';
 
 const CARD_DRAG_TYPE = 'application/x-hallowmoon-card';
 
 const BASE_CYCLE_MS = 60000;
 const TIMER_RESOLUTION_MS = 200;
 const SPEED_OPTIONS = [1, 2, 3] as const;
+
+const MANOR_ROOM_TEMPLATE_KEYS = [
+  'damaged-sanctum',
+  'damaged-scriptorium',
+  'damaged-archive',
+  'damaged-circle',
+  'damaged-bedroom'
+] as const;
 
 type SpeedOption = (typeof SPEED_OPTIONS)[number];
 
@@ -219,7 +228,9 @@ function SlotView({
   onCardDragStart,
   onCardDragEnd,
   timing,
-  isTimePaused
+  resources,
+  isTimePaused,
+  canExploreManor
 }: {
   slot: Slot;
   occupant: CardInstance | null;
@@ -237,7 +248,9 @@ function SlotView({
   onCardDragStart: (cardId: string) => void;
   onCardDragEnd: () => void;
   timing: CardTimingContext;
+  resources: Resources;
   isTimePaused: boolean;
+  canExploreManor: boolean;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 900px)');
@@ -346,6 +359,69 @@ function SlotView({
     }
   }
 
+  const actionLabel = occupant ? getActivateLabel() : null;
+
+  function evaluateActionAvailability(): { canActivate: boolean; note: string | null } {
+    if (!isSlotInteractive || !occupant) {
+      return { canActivate: false, note: null };
+    }
+
+    switch (slot.type) {
+      case 'hearth':
+      case 'work':
+      case 'bedroom': {
+        const canActivate = occupant.type === 'persona';
+        return {
+          canActivate,
+          note: canActivate ? null : 'Only a persona may make use of this slot.'
+        };
+      }
+      case 'manor': {
+        if (occupant.type !== 'persona') {
+          return { canActivate: false, note: 'Only a persona can tend to this chamber.' };
+        }
+        if (slot.state !== 'damaged' && !canExploreManor) {
+          return {
+            canActivate: false,
+            note: 'All discoverable rooms have been revealed for now.'
+          };
+        }
+        return { canActivate: true, note: null };
+      }
+      case 'ritual': {
+        if (occupant.type !== 'persona') {
+          return { canActivate: false, note: 'A persona must anchor the ritual.' };
+        }
+        const loreCost = Math.max(2, 2 + slot.level - 1);
+        if (resources.lore < loreCost) {
+          return {
+            canActivate: false,
+            note: `Requires ${loreCost} lore to perform this ritual.`
+          };
+        }
+        return { canActivate: true, note: null };
+      }
+      case 'expedition': {
+        if (occupant.type !== 'persona') {
+          return { canActivate: false, note: 'Only a persona can brave the Umbral Gate.' };
+        }
+        const glimmerCost = 1;
+        if (resources.glimmer < glimmerCost) {
+          return {
+            canActivate: false,
+            note: 'Requires 1 glimmer to light the path beyond the gate.'
+          };
+        }
+        return { canActivate: true, note: null };
+      }
+      default:
+        return { canActivate: true, note: null };
+    }
+  }
+
+  const { canActivate: actionRequirementsMet, note: actionAvailabilityNote } = evaluateActionAvailability();
+  const shouldShowPrimaryAction = Boolean(actionLabel && actionRequirementsMet);
+
   function acceptsCard(event: DragEvent<HTMLElement>) {
     return event.dataTransfer?.types.includes(CARD_DRAG_TYPE) ?? false;
   }
@@ -422,7 +498,9 @@ function SlotView({
     : hasSelectedCard
     ? `Assign ${selectedCardName ?? 'selected card'} to ${slot.name}`
     : occupant
-    ? `${getActivateLabel()} ${slot.name}`
+    ? actionRequirementsMet
+      ? `${actionLabel ?? 'Activate'} ${slot.name}`
+      : `${slot.name} cannot be activated right now`
     : `Assign a card to ${slot.name}`;
 
   function handlePrimaryClick() {
@@ -433,7 +511,7 @@ function SlotView({
       onClick(slot.id);
       return;
     }
-    if (occupant) {
+    if (occupant && actionRequirementsMet) {
       onActivate(slot.id);
     }
   }
@@ -474,12 +552,6 @@ function SlotView({
       </button>,
     );
   }
-
-  const shouldShowExploreAction =
-    slot.type === 'manor' &&
-    Boolean(occupant && occupant.type === 'persona') &&
-    isSlotInteractive;
-  const primaryActionLabel = shouldShowExploreAction ? getActivateLabel() : null;
 
   return (
     <section
@@ -561,12 +633,16 @@ function SlotView({
                 onCardDragEnd();
               }}
             />
-            <div className="slot-card__stack-label" aria-hidden="true">
-              <span className="slot-card__stack-label-action">{getActivateLabel()}</span>
-              {stackSize > 1 ? (
-                <span className="slot-card__stack-label-count">{stackSize} cards</span>
-              ) : null}
-            </div>
+            {shouldShowPrimaryAction || stackSize > 1 ? (
+              <div className="slot-card__stack-label" aria-hidden="true">
+                {shouldShowPrimaryAction ? (
+                  <span className="slot-card__stack-label-action">{actionLabel}</span>
+                ) : null}
+                {stackSize > 1 ? (
+                  <span className="slot-card__stack-label-count">{stackSize} cards</span>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="slot-card__placeholder" aria-live="polite">
@@ -596,14 +672,14 @@ function SlotView({
         </div>
       ) : null}
       <div className="slot-card__cta" role="group" aria-label={`${slot.name} actions`}>
-        {shouldShowExploreAction && primaryActionLabel ? (
+        {shouldShowPrimaryAction && actionLabel ? (
           <button
             className="slot-card__cta-button slot-card__cta-button--primary"
             type="button"
             onClick={() => onActivate(slot.id)}
             disabled={!isSlotInteractive}
           >
-            {primaryActionLabel}
+            {actionLabel}
           </button>
         ) : null}
         <button
@@ -647,6 +723,9 @@ function SlotView({
             </span>
           ) : null}
           {repairNote ? <span className="slot-card__note">{repairNote}</span> : null}
+          {actionAvailabilityNote ? (
+            <span className="slot-card__note">{actionAvailabilityNote}</span>
+          ) : null}
           {assistant && !assistantExpiry ? (
             <span className="slot-card__note">Assistant: {assistant.name}</span>
           ) : null}
@@ -774,6 +853,27 @@ export default function App() {
   const slots = useMemo(() => Object.values(state.slots).sort((a, b) => a.name.localeCompare(b.name)), [
     state.slots
   ]);
+
+  const canExploreManor = useMemo(() => {
+    const existingKeys = new Set(Object.values(state.slots).map((slotEntry) => slotEntry.key));
+
+    return MANOR_ROOM_TEMPLATE_KEYS.some((templateKey) => {
+      const template = SLOT_TEMPLATES[templateKey];
+      if (!template) {
+        return false;
+      }
+      const restoredTemplate = template.repair ? SLOT_TEMPLATES[template.repair.targetKey] : null;
+      const restoredKey = restoredTemplate?.key ?? null;
+
+      if (existingKeys.has(template.key)) {
+        return false;
+      }
+      if (restoredKey && existingKeys.has(restoredKey)) {
+        return false;
+      }
+      return true;
+    });
+  }, [state.slots]);
 
   const timingContext = useMemo<CardTimingContext>(
     () => ({ cycleDurationMs, timeToNextCycleMs: timeToNextCycle, timeScale: state.timeScale }),
@@ -980,7 +1080,9 @@ export default function App() {
                 onCardDragStart={handleCardDragStart}
                 onCardDragEnd={handleCardDragEnd}
                 timing={timingContext}
+                resources={state.resources}
                 isTimePaused={isPaused}
+                canExploreManor={slot.key === SLOT_TEMPLATES.manor.key ? canExploreManor : true}
               />
             );
           })}
