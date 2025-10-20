@@ -10,6 +10,7 @@ import {
   SlotTemplate
 } from './content';
 import { createCardInstance } from './content/cards';
+import { buildStoryLog } from '../content/storyBeats';
 import { formatDurationLabel } from '../utils/time';
 
 type RandomSource = () => number;
@@ -222,9 +223,7 @@ function initialState(): GameState {
     hand: [hero.id, whisper.id],
     slots,
     resources: baseResources(),
-    log: [
-      'You arrive at the shuttered manor. Its rooms slumber beneath dust and locked memories.'
-    ],
+    log: buildStoryLog('arrival'),
     discoveries: [],
     timeScale: 1,
     pendingReveals: []
