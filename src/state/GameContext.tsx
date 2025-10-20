@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useMemo, useReducer } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useReducer } from 'react';
 import {
   CardInstance,
   CardReward,
@@ -427,6 +427,7 @@ type Action =
   | { type: 'ACTIVATE_SLOT'; slotId: string }
   | { type: 'UPGRADE_SLOT'; slotId: string }
   | { type: 'ADVANCE_TIME' }
+  | { type: 'RESOLVE_PENDING_SLOT_ACTIONS' }
   | { type: 'SET_TIME_SCALE'; scale: number };
 
 interface SlotActionResult {
@@ -1563,6 +1564,9 @@ function gameReducer(state: GameState, action: Action): GameState {
 
       return nextState;
     }
+    case 'RESOLVE_PENDING_SLOT_ACTIONS': {
+      return resolvePendingSlotActions(state, Date.now());
+    }
     case 'SET_TIME_SCALE': {
       const nextScale = Math.max(0.25, action.scale);
       if (nextScale === state.timeScale) {
@@ -1654,6 +1658,38 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setTimeScale
     ]
   );
+
+  useEffect(() => {
+    const pendingSlots = Object.values(state.slots).filter((slot) => slot.pendingAction);
+    if (pendingSlots.length === 0) {
+      return;
+    }
+
+    const now = Date.now();
+    let earliestReadyAt = Number.POSITIVE_INFINITY;
+
+    for (const slot of pendingSlots) {
+      const readyAt = slot.lockedUntil ?? now;
+      if (readyAt < earliestReadyAt) {
+        earliestReadyAt = readyAt;
+      }
+    }
+
+    if (!Number.isFinite(earliestReadyAt)) {
+      return;
+    }
+
+    if (earliestReadyAt <= now + SLOT_ACTION_COMPLETION_TOLERANCE_MS) {
+      dispatch({ type: 'RESOLVE_PENDING_SLOT_ACTIONS' });
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      dispatch({ type: 'RESOLVE_PENDING_SLOT_ACTIONS' });
+    }, Math.max(0, earliestReadyAt - now) + SLOT_ACTION_COMPLETION_TOLERANCE_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [state.slots]);
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 }
