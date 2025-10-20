@@ -139,6 +139,8 @@ export function SlotRevealOverlay({ slot, onClose }: SlotRevealOverlayProps) {
           ref={cardRef}
           className={`slot-reveal__card${stage === 'outro' ? ' slot-reveal__card--outro' : ''}`}
         >
+          <span aria-hidden="true" className="slot-reveal__halo" />
+          <span aria-hidden="true" className="slot-reveal__spark-ring" />
           <span className="slot-reveal__type">
             <span className="slot-reveal__type-icon" aria-hidden="true">
               {slotTypeInfo.icon}

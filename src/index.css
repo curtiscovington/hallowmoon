@@ -1211,24 +1211,59 @@ body {
   position: relative;
   pointer-events: auto;
   width: 100%;
-  background: linear-gradient(185deg, rgba(38, 28, 64, 0.92), rgba(16, 11, 30, 0.96));
+  background:
+    radial-gradient(140% 120% at 50% -10%, rgba(116, 98, 214, 0.94), transparent 65%),
+    radial-gradient(110% 120% at 50% 120%, rgba(37, 24, 72, 0.98), rgba(15, 9, 29, 0.98));
   border-radius: 1.35rem;
-  border: 1px solid rgba(167, 148, 255, 0.5);
-  box-shadow: 0 24px 54px rgba(4, 2, 12, 0.65);
+  border: 1px solid rgba(189, 172, 255, 0.65);
+  box-shadow:
+    0 24px 54px rgba(4, 2, 12, 0.65),
+    0 0 0 1px rgba(142, 120, 255, 0.4);
   padding: clamp(1.5rem, 4vw, 2.1rem);
   display: grid;
   gap: 0.9rem;
   text-align: center;
+  overflow: hidden;
+  isolation: isolate;
   transform: translate3d(0, 0, 0) scale(1);
   opacity: 1;
-  transition: transform 360ms cubic-bezier(0.17, 0.89, 0.36, 1), opacity 240ms ease;
-  animation: slot-reveal-pop 260ms ease-out;
+  transition: transform 420ms cubic-bezier(0.16, 0.96, 0.36, 1.05), opacity 260ms ease;
+  animation: slot-reveal-pop 340ms cubic-bezier(0.18, 0.74, 0.35, 1);
 }
 
 .slot-reveal__card--outro {
   transform: translate3d(var(--slot-reveal-translate-x), var(--slot-reveal-translate-y), 0)
     scale(var(--slot-reveal-scale-x), var(--slot-reveal-scale-y));
   opacity: 0;
+}
+
+.slot-reveal__halo,
+.slot-reveal__spark-ring {
+  position: absolute;
+  inset: -40%;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.slot-reveal__halo {
+  background: radial-gradient(circle at 50% 50%, rgba(218, 204, 255, 0.28), transparent 60%);
+  filter: blur(12px);
+  opacity: 0.75;
+  animation: slot-reveal-halo 2800ms ease-in-out infinite alternate;
+}
+
+.slot-reveal__spark-ring {
+  background:
+    conic-gradient(
+      from 90deg,
+      rgba(255, 201, 132, 0.45),
+      rgba(255, 201, 132, 0),
+      rgba(177, 160, 255, 0.5),
+      rgba(255, 201, 132, 0)
+    );
+  mix-blend-mode: screen;
+  transform: rotate(8deg) scale(1.1);
+  animation: slot-reveal-sparks 3600ms linear infinite;
 }
 
 .slot-reveal__type {
@@ -1239,7 +1274,11 @@ body {
   font-size: 0.85rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(212, 200, 255, 0.8);
+  color: rgba(26, 12, 56, 0.9);
+  background: linear-gradient(135deg, rgba(255, 216, 164, 0.78), rgba(187, 166, 255, 0.82));
+  border-radius: 999px;
+  padding: 0.35rem 0.95rem;
+  box-shadow: 0 8px 22px rgba(27, 13, 63, 0.35);
 }
 
 .slot-reveal__type-icon {
@@ -1260,22 +1299,32 @@ body {
 
 .slot-reveal__button {
   justify-self: center;
-  padding: 0.7rem 1.6rem;
+  position: relative;
+  padding: 0.78rem 1.8rem;
   border-radius: 999px;
-  background: rgba(177, 160, 255, 0.85);
-  border: 1px solid rgba(214, 204, 255, 0.9);
-  color: #140a30;
+  background: linear-gradient(120deg, rgba(255, 216, 164, 0.95), rgba(187, 166, 255, 0.9));
+  border: 1px solid rgba(255, 240, 210, 0.9);
+  color: #12072c;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+  box-shadow:
+    0 18px 34px rgba(33, 13, 76, 0.45),
+    0 0 0 1px rgba(255, 223, 186, 0.55);
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease,
+    background 200ms ease;
+  overflow: hidden;
 }
 
 .slot-reveal__button:hover,
 .slot-reveal__button:focus-visible {
-  background: rgba(214, 204, 255, 0.95);
-  box-shadow: 0 16px 32px rgba(44, 26, 88, 0.35);
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, rgba(255, 223, 186, 0.98), rgba(205, 188, 255, 0.98));
+  box-shadow:
+    0 22px 40px rgba(36, 16, 80, 0.48),
+    0 0 0 1px rgba(255, 231, 198, 0.65);
+  transform: translateY(-2px) scale(1.01);
 }
 
 .slot-reveal__button:focus-visible {
@@ -1283,15 +1332,78 @@ body {
   outline-offset: 2px;
 }
 
+.slot-reveal__button::after {
+  content: '';
+  position: absolute;
+  inset: -30% -60%;
+  background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.6), transparent 55%);
+  opacity: 0;
+  transform: translateX(-60%);
+  animation: slot-reveal-button-shimmer 3200ms ease-in-out infinite;
+}
+
 @keyframes slot-reveal-pop {
-  from {
-    transform: scale(0.82);
+  0% {
+    transform: translate3d(0, 28px, 0) scale(0.82);
     opacity: 0;
   }
 
-  to {
-    transform: scale(1);
+  55% {
+    transform: translate3d(0, -12px, 0) scale(1.06);
     opacity: 1;
+  }
+
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slot-reveal-halo {
+  0% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+
+  100% {
+    transform: scale(1.12);
+    opacity: 0.85;
+  }
+}
+
+@keyframes slot-reveal-sparks {
+  0% {
+    transform: rotate(0deg) scale(1.1);
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 0.75;
+  }
+
+  100% {
+    transform: rotate(360deg) scale(1.15);
+    opacity: 0.45;
+  }
+}
+
+@keyframes slot-reveal-button-shimmer {
+  0% {
+    opacity: 0;
+    transform: translateX(-60%);
+  }
+
+  40% {
+    opacity: 0;
+  }
+
+  55% {
+    opacity: 0.85;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(60%);
   }
 }
 
@@ -1305,6 +1417,12 @@ body {
 
   .slot-reveal__card--outro {
     transform: none;
+  }
+
+  .slot-reveal__halo,
+  .slot-reveal__spark-ring,
+  .slot-reveal__button::after {
+    animation: none !important;
   }
 }
 
