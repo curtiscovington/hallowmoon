@@ -437,7 +437,7 @@ function augmentJournalWithDream(journal: CardInstance, dreamTitle: string): Car
   return applyJournalEntries(journal, updatedEntries);
 }
 
-function createJournalFromDream(dream: CardInstance, _persona: CardInstance): CardInstance {
+function createJournalFromDream(dream: CardInstance): CardInstance {
   const recordedTitle = extractDreamTitle(dream) || dream.name;
   const template: CardTemplate = {
     key: 'private-journal',
@@ -1044,7 +1044,7 @@ function studySlot(state: GameState, slot: Slot, log: string[]): SlotActionResul
         `${assistant.name} expands ${existingJournal.name} with ${card.name}. The entry will be ready once the study concludes.`
       );
     } else {
-      const journal = createJournalFromDream(card, assistant);
+      const journal = createJournalFromDream(card);
       const journalCard: CardInstance = { ...journal, location: { area: 'lost' } };
       updatedCards[journalCard.id] = journalCard;
       stagedIds.push(journalCard.id);
