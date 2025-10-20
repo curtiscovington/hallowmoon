@@ -264,7 +264,6 @@ function SlotView({
   const displayLockRemainingMs = Math.max(0, Math.round(lockRemainingMs * timing.timeScale));
   const isSlotLocked = Boolean(slot.lockedUntil && lockRemainingMs > 0);
   const isSlotInteractive = slot.unlocked && !isSlotLocked;
-  const canActivate = isSlotInteractive;
   const upgradeDisabled =
     !isSlotInteractive || slot.state === 'damaged' || slot.upgradeCost === 0;
   const slotClasses = ['slot-card'];
