@@ -1907,7 +1907,9 @@ function gameReducer(state: GameState, action: Action): GameState {
 
       nextState = {
         ...nextState,
+        cards: updatedCards,
         slots: updatedSlots,
+        hand: updatedHand,
         log: updatedLog
       };
 
