@@ -475,6 +475,12 @@ function SlotView({
     );
   }
 
+  const shouldShowExploreAction =
+    slot.type === 'manor' &&
+    Boolean(occupant && occupant.type === 'persona') &&
+    isSlotInteractive;
+  const primaryActionLabel = shouldShowExploreAction ? getActivateLabel() : null;
+
   return (
     <section
       className={slotClasses.join(' ')}
@@ -590,6 +596,16 @@ function SlotView({
         </div>
       ) : null}
       <div className="slot-card__cta" role="group" aria-label={`${slot.name} actions`}>
+        {shouldShowExploreAction && primaryActionLabel ? (
+          <button
+            className="slot-card__cta-button slot-card__cta-button--primary"
+            type="button"
+            onClick={() => onActivate(slot.id)}
+            disabled={!isSlotInteractive}
+          >
+            {primaryActionLabel}
+          </button>
+        ) : null}
         <button
           className="slot-card__cta-button slot-card__cta-button--secondary"
           type="button"
