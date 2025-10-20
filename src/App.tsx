@@ -1,4 +1,4 @@
-import { DragEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { DragEvent, ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useGame } from './state/GameContext';
 import { CardInstance, Slot } from './state/types';
 import { SLOT_TYPE_INFO } from './constants/slotTypeInfo';
@@ -250,6 +250,9 @@ function SlotView({
   const displayLockRemainingMs = Math.max(0, Math.round(lockRemainingMs * timing.timeScale));
   const isSlotLocked = Boolean(slot.lockedUntil && lockRemainingMs > 0);
   const isSlotInteractive = slot.unlocked && !isSlotLocked;
+  const canActivate = isSlotInteractive;
+  const upgradeDisabled =
+    !isSlotInteractive || slot.state === 'damaged' || slot.upgradeCost === 0;
   const slotClasses = ['slot-card'];
   if (!slot.unlocked) {
     slotClasses.push('slot-card--locked');
@@ -277,7 +280,7 @@ function SlotView({
       : `Resolving · ≈ ${formatDuration(displayLockRemainingMs)}`
     : isTimePaused
     ? 'Time paused'
-    : 'Ready';
+    : getActivateLabel();
 
   const occupantExpiry = occupant ? describeCardExpiry(occupant, timing) : null;
   const assistantExpiry = assistant ? describeCardExpiry(assistant, timing) : null;
@@ -391,6 +394,35 @@ function SlotView({
     dropzoneClasses.push('slot-card__dropzone--hero');
   }
 
+  const detailActions: ReactNode[] = [];
+  if (assistant) {
+    detailActions.push(
+      <button
+        key="assistant"
+        className="slot-card__action"
+        type="button"
+        onClick={() => onRecall(assistant.id)}
+        disabled={isSlotLocked}
+      >
+        {`Recall ${assistant.name}`}
+      </button>,
+    );
+  }
+
+  if (occupant) {
+    detailActions.push(
+      <button
+        key="occupant"
+        className="slot-card__action"
+        type="button"
+        onClick={() => onRecall(occupant.id)}
+        disabled={isSlotLocked}
+      >
+        {`Recall ${occupant.name}`}
+      </button>,
+    );
+  }
+
   return (
     <section
       className={slotClasses.join(' ')}
@@ -479,6 +511,24 @@ function SlotView({
         ) : null}
         {occupantTraits ? <span className="slot-card__occupant-traits">{occupantTraits}</span> : null}
       </button>
+      <div className="slot-card__cta" role="group" aria-label={`${slot.name} actions`}>
+        <button
+          className="slot-card__cta-button slot-card__cta-button--primary"
+          type="button"
+          onClick={() => onActivate(slot.id)}
+          disabled={!canActivate}
+        >
+          {getActivateLabel()}
+        </button>
+        <button
+          className="slot-card__cta-button slot-card__cta-button--secondary"
+          type="button"
+          onClick={() => onUpgrade(slot.id)}
+          disabled={upgradeDisabled}
+        >
+          Upgrade ({upgradeCost} ✦)
+        </button>
+      </div>
       <div
         id={detailsId}
         className={`slot-card__details${showDetails ? ' slot-card__details--open' : ''}`}
@@ -488,44 +538,9 @@ function SlotView({
           <span className="slot-card__traits">{slot.traits.join(' · ')}</span>
           <span className="slot-card__accepted">{acceptanceLabel}</span>
         </div>
-        <div className="slot-card__actions">
-          <button
-            className="slot-card__action"
-            type="button"
-            onClick={() => onActivate(slot.id)}
-            disabled={!isSlotInteractive}
-          >
-            {getActivateLabel()}
-          </button>
-          <button
-            className="slot-card__action"
-            type="button"
-            onClick={() => onUpgrade(slot.id)}
-            disabled={!isSlotInteractive || slot.state === 'damaged' || slot.upgradeCost === 0}
-          >
-            Upgrade ({upgradeCost} ✦)
-          </button>
-          {assistant ? (
-            <button
-              className="slot-card__action"
-              type="button"
-              onClick={() => onRecall(assistant.id)}
-              disabled={isSlotLocked}
-            >
-              {`Recall ${assistant.name}`}
-            </button>
-          ) : null}
-          {occupant ? (
-            <button
-              className="slot-card__action"
-              type="button"
-              onClick={() => onRecall(occupant.id)}
-              disabled={isSlotLocked}
-            >
-              {`Recall ${occupant.name}`}
-            </button>
-          ) : null}
-        </div>
+        {detailActions.length > 0 ? (
+          <div className="slot-card__actions">{detailActions}</div>
+        ) : null}
         <div className="slot-card__notes">
           {!occupant && !slot.unlocked ? (
             <span className="slot-card__note">Requires a discovery.</span>
