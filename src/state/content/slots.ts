@@ -97,7 +97,7 @@ export const SLOT_TEMPLATES: Record<string, SlotTemplate> = {
     traits: ['dream'],
     accepted: 'persona-only',
     upgradeCost: 4,
-    unlocked: false
+    unlocked: true
   },
   'damaged-sanctum': {
     key: 'ruined-sanctum',
