@@ -15,6 +15,8 @@
 | Ruined Circle | Echoing Circle | ritual | Persona must begin repairs and stay assigned | ≈ 3 minutes |
 | Ruined Bedroom | Moonlit Bedroom | bedroom | Persona must begin repairs and stay assigned | ≈ 2 minutes |
 
+Restoring the Ruined Archive now rewards a **Private Journal** card, placing it directly into the hand once the study is ready for use again.
+
 > _Time pulses remain hidden during play. Each interval maps to roughly one minute at normal speed; pausing stops the countdown._
 
 ## Slot Action Downtimes
