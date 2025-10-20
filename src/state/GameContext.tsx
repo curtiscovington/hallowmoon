@@ -20,7 +20,6 @@ interface GameContextValue {
   advanceTime: () => void;
   getUpgradeCost: (slotId: string) => number;
   setTimeScale: (scale: number) => void;
-  acknowledgeCardReveal: (cardId: string) => void;
 }
 
 const GameContext = React.createContext<GameContextValue | null>(null);
@@ -300,8 +299,7 @@ function instantiateSlot(template: SlotTemplate, id?: string): Slot {
     repair,
     repairStarted: false,
     lockedUntil: null,
-    pendingAction: null,
-    attachedCardIds: []
+    pendingAction: null
   };
 }
 
@@ -354,18 +352,12 @@ const DREAM_TITLES = [
   'Shattered Constellations'
 ] as const;
 
-const JOURNAL_CARD_NAME = 'Private Journal';
-
 function randomFrom<T>(options: readonly T[]): T {
   return options[Math.floor(Math.random() * options.length)];
 }
 
 function isDreamCard(card: CardInstance | undefined): card is CardInstance {
   return Boolean(card && card.traits.includes('dream'));
-}
-
-function isJournalCard(card: CardInstance | undefined): card is CardInstance {
-  return Boolean(card && card.traits.includes('journal'));
 }
 
 function extractDreamTitle(dream: CardInstance): string {
@@ -386,69 +378,17 @@ function createDreamCard(): CardInstance {
   return instantiateCard(template);
 }
 
-function extractJournalDreams(journal: CardInstance): string[] {
-  return journal.traits
-    .filter((trait) => trait.startsWith('dream:'))
-    .map((trait) => trait.slice('dream:'.length));
-}
-
-function formatJournalDescription(entries: string[]): string {
-  if (entries.length === 0) {
-    return 'Blank pages await recorded dreams.';
-  }
-  if (entries.length === 1) {
-    return `Pages capture the dream of ${entries[0]}.`;
-  }
-  if (entries.length === 2) {
-    return `Entries chronicle the dreams of ${entries[0]} and ${entries[1]}.`;
-  }
-
-  const rest = entries.slice(0, -1).join(', ');
-  const last = entries[entries.length - 1];
-  return `Entries chronicle the dreams of ${rest}, and ${last}.`;
-}
-
-function describeJournal(entries: string[]): string {
-  return `A bound journal cataloguing lucid recollections. ${formatJournalDescription(entries)}`;
-}
-
-function normalizeJournalTraits(journal: CardInstance, entries: string[]): string[] {
-  const baseTraits = journal.traits.filter((trait) => !trait.startsWith('dream:'));
-  const dedupedBase = Array.from(new Set(baseTraits.filter((trait) => trait !== 'journal' && trait !== 'dream-record')));
-  const dreamTraits = entries.map((entry) => `dream:${entry}`);
-  return [...dedupedBase, 'journal', 'dream-record', ...dreamTraits];
-}
-
-function applyJournalEntries(journal: CardInstance, entries: string[]): CardInstance {
-  return {
-    ...journal,
-    name: JOURNAL_CARD_NAME,
-    description: describeJournal(entries),
-    traits: normalizeJournalTraits(journal, entries),
-    permanent: true,
-    remainingTurns: null
-  };
-}
-
-function augmentJournalWithDream(journal: CardInstance, dreamTitle: string): CardInstance {
-  const existingEntries = extractJournalDreams(journal);
-  const hasEntry = existingEntries.includes(dreamTitle);
-  const updatedEntries = hasEntry ? existingEntries : [...existingEntries, dreamTitle];
-  return applyJournalEntries(journal, updatedEntries);
-}
-
-function createJournalFromDream(dream: CardInstance, _persona: CardInstance): CardInstance {
+function createJournalFromDream(dream: CardInstance, persona: CardInstance): CardInstance {
   const recordedTitle = extractDreamTitle(dream) || dream.name;
   const template: CardTemplate = {
     key: 'private-journal',
-    name: JOURNAL_CARD_NAME,
+    name: `Private Journal: ${recordedTitle}`,
     type: 'inspiration',
-    description: describeJournal([recordedTitle]),
+    description: `${persona.name} documents the dream of ${recordedTitle}, preserving its whispers for later study.`,
     traits: ['journal', 'dream-record', `dream:${recordedTitle}`],
-    permanent: true
+    permanent: false
   };
-  const journal = instantiateCard(template);
-  return applyJournalEntries(journal, [recordedTitle]);
+  return instantiateCard(template);
 }
 
 function baseResources(): Resources {
@@ -477,8 +417,7 @@ function initialState(): GameState {
       'You arrive at the shuttered manor. Its rooms slumber beneath dust and locked memories.'
     ],
     discoveries: [],
-    timeScale: 1,
-    pendingReveals: []
+    timeScale: 1
   };
 }
 
@@ -489,8 +428,7 @@ type Action =
   | { type: 'UPGRADE_SLOT'; slotId: string }
   | { type: 'ADVANCE_TIME' }
   | { type: 'RESOLVE_PENDING_SLOT_ACTIONS' }
-  | { type: 'SET_TIME_SCALE'; scale: number }
-  | { type: 'ACKNOWLEDGE_CARD_REVEAL'; cardId: string };
+  | { type: 'SET_TIME_SCALE'; scale: number };
 
 interface SlotActionResult {
   state: GameState;
@@ -859,60 +797,6 @@ function resolvePendingSlotActions(state: GameState, now: number): GameState {
         nextState = result.state;
         break;
       }
-      case 'deliver-cards': {
-        const { cardIds, reveal } = slot.pendingAction;
-        let updatedState = nextState;
-        let updatedCards = { ...updatedState.cards };
-        let updatedHand = [...updatedState.hand];
-        let updatedSlots = { ...updatedState.slots };
-        let updatedLog = updatedState.log;
-        const deliveredNames: string[] = [];
-
-        for (const cardId of cardIds) {
-          const card = updatedCards[cardId];
-          if (!card) {
-            continue;
-          }
-          deliveredNames.push(card.name);
-          updatedCards = {
-            ...updatedCards,
-            [cardId]: { ...card, location: { area: 'hand' } }
-          };
-          updatedHand = addToHand(updatedHand, cardId, false);
-        }
-
-        if (deliveredNames.length > 0) {
-          const summary = `${slot.name} yields ${deliveredNames.join(', ')}.`;
-          updatedLog = appendLog(updatedLog, summary);
-        }
-
-        const clearedSlot: Slot = {
-          ...slot,
-          lockedUntil: null,
-          pendingAction: null
-        };
-
-        updatedSlots = {
-          ...updatedSlots,
-          [slotId]: clearedSlot
-        };
-
-        const pendingReveals = reveal
-          ? [...updatedState.pendingReveals, ...cardIds]
-          : updatedState.pendingReveals;
-
-        updatedState = {
-          ...updatedState,
-          cards: updatedCards,
-          hand: updatedHand,
-          slots: updatedSlots,
-          log: updatedLog,
-          pendingReveals
-        };
-
-        nextState = updatedState;
-        break;
-      }
       default:
         break;
     }
@@ -981,32 +865,19 @@ function bedroomSlot(state: GameState, slot: Slot, log: string[]): SlotActionRes
   }
 
   const dream = createDreamCard();
-  const stagedDream: CardInstance = { ...dream, location: { area: 'lost' } };
-
-  const updatedSlots = {
-    ...state.slots,
-    [slot.id]: {
-      ...slot,
-      pendingAction: {
-        type: 'deliver-cards',
-        cardIds: [stagedDream.id],
-        reveal: true
-      }
-    }
-  };
 
   const nextState: GameState = {
     ...state,
     cards: {
       ...state.cards,
-      [stagedDream.id]: stagedDream
+      [dream.id]: dream
     },
-    slots: updatedSlots
+    hand: addToHand(state.hand, dream.id, false)
   };
 
   const nextLog = appendLog(
     log,
-    `${persona.name} slumbers in ${slot.name}. A dream will surface when their rest concludes.`
+    `${persona.name} slumbers in ${slot.name}, awakening with ${dream.name}.`
   );
 
   return { state: nextState, log: nextLog, performed: true };
@@ -1023,68 +894,34 @@ function studySlot(state: GameState, slot: Slot, log: string[]): SlotActionResul
   }
 
   const assistant = slot.assistantId ? state.cards[slot.assistantId] ?? null : null;
-  const attachmentCards = slot.attachedCardIds
-    .map((id) => state.cards[id])
-    .filter((attached): attached is CardInstance => Boolean(attached));
 
   if (isDreamCard(card) && assistant && assistant.type === 'persona') {
-    const existingJournal = attachmentCards.find((attached) => attached.traits.includes('journal'));
+    const journal = createJournalFromDream(card, assistant);
     const updatedCards = { ...state.cards };
     delete updatedCards[card.id];
+    const journalCard = { ...journal };
+    updatedCards[journalCard.id] = journalCard;
 
-    const stagedIds: string[] = [];
-    let nextLog = log;
-
-    if (existingJournal) {
-      const augmented = augmentJournalWithDream(existingJournal, extractDreamTitle(card) || card.name);
-      updatedCards[existingJournal.id] = { ...augmented, location: { area: 'lost' } };
-      stagedIds.push(existingJournal.id);
-      nextLog = appendLog(
-        log,
-        `${assistant.name} expands ${existingJournal.name} with ${card.name}. The entry will be ready once the study concludes.`
-      );
-    } else {
-      const journal = createJournalFromDream(card, assistant);
-      const journalCard: CardInstance = { ...journal, location: { area: 'lost' } };
-      updatedCards[journalCard.id] = journalCard;
-      stagedIds.push(journalCard.id);
-      nextLog = appendLog(
-        log,
-        `${assistant.name} records ${card.name}, preserving it within ${journalCard.name}. The entry will be ready once the study concludes.`
-      );
-    }
-
-    const cleanedAttachments = slot.attachedCardIds.filter((id) => {
-      if (existingJournal && id === existingJournal.id) {
-        return false;
-      }
-      return true;
-    });
+    const updatedHand = addToHand(removeFromHand(state.hand, card.id), journalCard.id, false);
 
     const updatedSlots = {
       ...state.slots,
       [slot.id]: {
         ...slot,
         occupantId: assistant.id,
-        assistantId: null,
-        attachedCardIds: cleanedAttachments,
-        pendingAction: {
-          type: 'deliver-cards',
-          cardIds: stagedIds,
-          reveal: true
-        }
+        assistantId: null
       }
     };
 
-    const updatedHand = removeFromHand(state.hand, card.id);
+    const nextLog = appendLog(
+      log,
+      `${assistant.name} records ${card.name}, preserving it as ${journalCard.name}.`
+    );
 
     return {
       state: {
         ...state,
-        cards: {
-          ...updatedCards,
-          [assistant.id]: { ...assistant, location: { area: 'slot', slotId: slot.id } }
-        },
+        cards: updatedCards,
         slots: updatedSlots,
         hand: updatedHand
       },
@@ -1132,8 +969,7 @@ function studySlot(state: GameState, slot: Slot, log: string[]): SlotActionResul
     [slot.id]: {
       ...slot,
       occupantId: null,
-      assistantId: null,
-      attachedCardIds: []
+      assistantId: null
     }
   };
 
@@ -1369,15 +1205,13 @@ function gameReducer(state: GameState, action: Action): GameState {
       } else if (card.location.area === 'slot') {
         const previousSlot = updatedSlots[card.location.slotId];
         if (previousSlot) {
-          let nextPreviousSlot: Slot = previousSlot;
-
           if (previousSlot.occupantId === card.id) {
             const promotedOccupant =
               previousSlot.assistantId && previousSlot.assistantId !== card.id
                 ? previousSlot.assistantId
                 : null;
-            nextPreviousSlot = {
-              ...nextPreviousSlot,
+            updatedSlots[previousSlot.id] = {
+              ...previousSlot,
               occupantId: promotedOccupant,
               assistantId:
                 promotedOccupant && previousSlot.assistantId === promotedOccupant
@@ -1387,20 +1221,11 @@ function gameReducer(state: GameState, action: Action): GameState {
                   : previousSlot.assistantId
             };
           } else if (previousSlot.assistantId === card.id) {
-            nextPreviousSlot = {
-              ...nextPreviousSlot,
+            updatedSlots[previousSlot.id] = {
+              ...previousSlot,
               assistantId: null
             };
           }
-
-          if (nextPreviousSlot.attachedCardIds.includes(card.id)) {
-            nextPreviousSlot = {
-              ...nextPreviousSlot,
-              attachedCardIds: nextPreviousSlot.attachedCardIds.filter((id) => id !== card.id)
-            };
-          }
-
-          updatedSlots[previousSlot.id] = nextPreviousSlot;
         }
       }
 
@@ -1409,43 +1234,6 @@ function gameReducer(state: GameState, action: Action): GameState {
       const currentAssistantId = targetSlot.assistantId;
       const currentOccupant = currentOccupantId ? updatedCards[currentOccupantId] : undefined;
       const currentAssistant = currentAssistantId ? updatedCards[currentAssistantId] : undefined;
-      const currentAttachments = targetSlot.attachedCardIds;
-      const attachmentCards = currentAttachments
-        .map((id) => updatedCards[id])
-        .filter((attached): attached is CardInstance => Boolean(attached));
-
-      const ensureAttachmentIds = (ids: string[]) => Array.from(new Set(ids));
-
-      if (
-        slot.type === 'study' &&
-        currentOccupant &&
-        currentOccupant.type === 'persona' &&
-        isJournalCard(card) &&
-        !currentAssistantId
-      ) {
-        updatedCards = {
-          ...updatedCards,
-          [currentOccupant.id]: { ...currentOccupant, location: { area: 'slot', slotId: slot.id } },
-          [card.id]: { ...card, location: { area: 'slot', slotId: slot.id } }
-        };
-        updatedSlots[slot.id] = {
-          ...targetSlot,
-          occupantId: card.id,
-          assistantId: currentOccupant.id,
-          attachedCardIds: ensureAttachmentIds(currentAttachments.filter((id) => id !== card.id))
-        };
-        updatedLog = appendLog(
-          updatedLog,
-          `${card.name} is opened for ${currentOccupant.name}, ready to capture their studies.`
-        );
-        return {
-          ...state,
-          cards: updatedCards,
-          slots: updatedSlots,
-          hand: updatedHand,
-          log: updatedLog
-        };
-      }
 
       if (
         slot.type === 'study' &&
@@ -1462,50 +1250,12 @@ function gameReducer(state: GameState, action: Action): GameState {
         updatedSlots[slot.id] = {
           ...targetSlot,
           occupantId: card.id,
-          assistantId: currentOccupant.id,
-          attachedCardIds: ensureAttachmentIds(currentAttachments.filter((id) => id !== card.id))
+          assistantId: currentOccupant.id
         };
         updatedLog = appendLog(
           updatedLog,
           `${card.name} is entrusted to ${currentOccupant.name} for study.`
         );
-        return {
-          ...state,
-          cards: updatedCards,
-          slots: updatedSlots,
-          hand: updatedHand,
-          log: updatedLog
-        };
-      }
-
-      if (
-        slot.type === 'study' &&
-        currentOccupant &&
-        isDreamCard(currentOccupant) &&
-        currentAssistant &&
-        currentAssistant.type === 'persona' &&
-        isJournalCard(card)
-      ) {
-        updatedCards = {
-          ...updatedCards,
-          [card.id]: { ...card, location: { area: 'slot', slotId: slot.id } }
-        };
-
-        const nextAttachments = ensureAttachmentIds([
-          ...currentAttachments.filter((id) => id !== card.id),
-          card.id
-        ]);
-
-        updatedSlots[slot.id] = {
-          ...targetSlot,
-          attachedCardIds: nextAttachments
-        };
-
-        updatedLog = appendLog(
-          updatedLog,
-          `${card.name} lies open for ${currentAssistant.name}, ready to capture ${currentOccupant.name}.`
-        );
-
         return {
           ...state,
           cards: updatedCards,
@@ -1543,46 +1293,6 @@ function gameReducer(state: GameState, action: Action): GameState {
         };
       }
 
-      if (
-        slot.type === 'study' &&
-        currentOccupant &&
-        isJournalCard(currentOccupant) &&
-        currentAssistant &&
-        currentAssistant.type === 'persona' &&
-        isDreamCard(card)
-      ) {
-        const nextAttachments = ensureAttachmentIds([
-          ...currentAttachments.filter((id) => id !== card.id && id !== currentOccupant.id),
-          currentOccupant.id
-        ]);
-
-        updatedCards = {
-          ...updatedCards,
-          [currentOccupant.id]: { ...currentOccupant, location: { area: 'slot', slotId: slot.id } },
-          [card.id]: { ...card, location: { area: 'slot', slotId: slot.id } }
-        };
-
-        updatedSlots[slot.id] = {
-          ...targetSlot,
-          occupantId: card.id,
-          assistantId: currentAssistant.id,
-          attachedCardIds: nextAttachments
-        };
-
-        updatedLog = appendLog(
-          updatedLog,
-          `${card.name} is placed for ${currentAssistant.name} to chronicle within ${currentOccupant.name}.`
-        );
-
-        return {
-          ...state,
-          cards: updatedCards,
-          slots: updatedSlots,
-          hand: updatedHand,
-          log: updatedLog
-        };
-      }
-
       if (currentOccupantId && currentOccupantId !== card.id) {
         const displacedUpdates: Record<string, CardInstance> = {};
 
@@ -1602,17 +1312,6 @@ function gameReducer(state: GameState, action: Action): GameState {
           updatedHand = addToHand(updatedHand, currentAssistant.id);
         }
 
-        for (const attachment of attachmentCards) {
-          if (attachment.id === card.id) {
-            continue;
-          }
-          displacedUpdates[attachment.id] = {
-            ...attachment,
-            location: { area: 'hand' }
-          };
-          updatedHand = addToHand(updatedHand, attachment.id);
-        }
-
         updatedCards = {
           ...updatedCards,
           ...displacedUpdates,
@@ -1622,8 +1321,7 @@ function gameReducer(state: GameState, action: Action): GameState {
         updatedSlots[slot.id] = {
           ...targetSlot,
           occupantId: card.id,
-          assistantId: null,
-          attachedCardIds: []
+          assistantId: null
         };
       } else {
         updatedCards = {
@@ -1637,10 +1335,7 @@ function gameReducer(state: GameState, action: Action): GameState {
         updatedSlots[slot.id] = {
           ...targetSlot,
           occupantId: card.id,
-          assistantId: targetSlot.assistantId && targetSlot.assistantId !== card.id ? targetSlot.assistantId : null,
-          attachedCardIds: ensureAttachmentIds(
-            currentAttachments.filter((id) => id !== card.id)
-          )
+          assistantId: targetSlot.assistantId && targetSlot.assistantId !== card.id ? targetSlot.assistantId : null
         };
       }
 
@@ -1695,13 +1390,6 @@ function gameReducer(state: GameState, action: Action): GameState {
             nextSlot = {
               ...slot,
               assistantId: null
-            };
-          }
-
-          if (nextSlot.attachedCardIds.includes(card.id)) {
-            nextSlot = {
-              ...nextSlot,
-              attachedCardIds: nextSlot.attachedCardIds.filter((id) => id !== card.id)
             };
           }
 
@@ -1791,26 +1479,18 @@ function gameReducer(state: GameState, action: Action): GameState {
                       : slot.assistantId
                 }
               };
-          } else if (slot && slot.assistantId === card.id) {
-            updatedSlots = {
-              ...updatedSlots,
-              [slot.id]: {
-                ...slot,
-                assistantId: null
-              }
-            };
-          } else if (slot && slot.attachedCardIds.includes(card.id)) {
-            updatedSlots = {
-              ...updatedSlots,
-              [slot.id]: {
-                ...slot,
-                attachedCardIds: slot.attachedCardIds.filter((id) => id !== card.id)
-              }
-            };
+            } else if (slot && slot.assistantId === card.id) {
+              updatedSlots = {
+                ...updatedSlots,
+                [slot.id]: {
+                  ...slot,
+                  assistantId: null
+                }
+              };
+            }
           }
-        }
-        delete updatedCards[card.id];
-        updatedLog = appendLog(updatedLog, `${card.name} fades before it can be used.`);
+          delete updatedCards[card.id];
+          updatedLog = appendLog(updatedLog, `${card.name} fades before it can be used.`);
         } else {
           updatedCards = {
             ...updatedCards,
@@ -1928,19 +1608,6 @@ function gameReducer(state: GameState, action: Action): GameState {
         slots: adjustedSlots
       };
     }
-    case 'ACKNOWLEDGE_CARD_REVEAL': {
-      const index = state.pendingReveals.indexOf(action.cardId);
-      if (index === -1) {
-        return state;
-      }
-
-      const nextPending = state.pendingReveals.filter((id, idx) => idx !== index);
-
-      return {
-        ...state,
-        pendingReveals: nextPending
-      };
-    }
     default:
       return state;
   }
@@ -1973,10 +1640,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SET_TIME_SCALE', scale });
   }, []);
 
-  const acknowledgeCardReveal = useCallback((cardId: string) => {
-    dispatch({ type: 'ACKNOWLEDGE_CARD_REVEAL', cardId });
-  }, []);
-
   const getUpgradeCost = useCallback(
     (slotId: string) => {
       const slot = state.slots[slotId];
@@ -1994,8 +1657,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       upgradeSlot,
       advanceTime,
       getUpgradeCost,
-      setTimeScale,
-      acknowledgeCardReveal
+      setTimeScale
     }),
     [
       state,
@@ -2005,8 +1667,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       upgradeSlot,
       advanceTime,
       getUpgradeCost,
-      setTimeScale,
-      acknowledgeCardReveal
+      setTimeScale
     ]
   );
 

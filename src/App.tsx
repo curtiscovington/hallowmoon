@@ -3,7 +3,6 @@ import { useGame } from './state/GameContext';
 import { CardInstance, Slot } from './state/types';
 import { SLOT_TYPE_INFO } from './constants/slotTypeInfo';
 import { SlotRevealOverlay } from './components/SlotRevealOverlay';
-import { CardRevealOverlay } from './components/CardRevealOverlay';
 
 const CARD_DRAG_TYPE = 'application/x-hallowmoon-card';
 
@@ -214,7 +213,6 @@ function SlotView({
   slot,
   occupant,
   assistant,
-  attachments,
   isHeroInSlot,
   onClick,
   onActivate,
@@ -230,7 +228,6 @@ function SlotView({
   slot: Slot;
   occupant: CardInstance | null;
   assistant: CardInstance | null;
-  attachments: CardInstance[];
   isHeroInSlot: boolean;
   onClick: (slotId: string) => void;
   onActivate: (slotId: string) => void;
@@ -259,8 +256,7 @@ function SlotView({
   const acceptanceLabel = describeSlotAcceptance(slot.accepted);
   const occupantTraitSources = [
     ...(occupant ? occupant.traits : []),
-    ...(assistant ? assistant.traits : []),
-    ...attachments.flatMap((card) => card.traits)
+    ...(assistant ? assistant.traits : [])
   ];
   const occupantTraits =
     occupantTraitSources.length > 0 ? Array.from(new Set(occupantTraitSources)).join(' · ') : null;
@@ -314,24 +310,6 @@ function SlotView({
 
   function getActivateLabel(): string {
     switch (slot.type) {
-      case 'study': {
-        const personaPresent =
-          (occupant && occupant.type === 'persona') || (assistant && assistant.type === 'persona');
-        const occupantIsDream = Boolean(occupant && occupant.traits.includes('dream'));
-        const occupantIsJournal = Boolean(occupant && occupant.traits.includes('journal'));
-        const hasJournalAttachment = attachments.some((card) => card.traits.includes('journal'));
-
-        if (personaPresent && occupantIsDream && hasJournalAttachment) {
-          return 'Record Dream';
-        }
-        if (personaPresent && (occupantIsJournal || hasJournalAttachment)) {
-          return 'Annotate Journal';
-        }
-        if (occupantIsDream) {
-          return 'Interpret Dream';
-        }
-        return 'Study';
-      }
       case 'work':
         return 'Work';
       case 'hearth':
@@ -486,15 +464,6 @@ function SlotView({
             <span className="slot-card__placeholder-hint">Drop a compatible card here.</span>
           </div>
         )}
-        {attachments.length > 0 ? (
-          <ul className="slot-card__attachments">
-            {attachments.map((card) => (
-              <li key={card.id} className="slot-card__attachment">
-                {card.name}
-              </li>
-            ))}
-          </ul>
-        ) : null}
         {occupantTraits ? <span className="slot-card__occupant-traits">{occupantTraits}</span> : null}
       </button>
       <div
@@ -586,8 +555,7 @@ export default function App() {
     advanceTime,
     getUpgradeCost,
     recallCard,
-    setTimeScale,
-    acknowledgeCardReveal
+    setTimeScale
   } = useGame();
   const isDesktop = useMediaQuery('(min-width: 900px)');
   const [isPaused, setIsPaused] = useState(false);
@@ -639,8 +607,7 @@ export default function App() {
   }, [state.slots]);
 
   useEffect(() => {
-    const pendingCardReveals = state.pendingReveals.length;
-    if (slotRevealQueue.length > 0 || pendingCardReveals > 0) {
+    if (slotRevealQueue.length > 0) {
       if (!isPaused) {
         autoPausedByRevealRef.current = true;
         setIsPaused(true);
@@ -649,7 +616,7 @@ export default function App() {
       autoPausedByRevealRef.current = false;
       setIsPaused(false);
     }
-  }, [isPaused, slotRevealQueue.length, state.pendingReveals.length]);
+  }, [isPaused, slotRevealQueue.length]);
 
   const activeRevealSlotId = slotRevealQueue[0] ?? null;
   const activeRevealSlot = activeRevealSlotId ? state.slots[activeRevealSlotId] ?? null : null;
@@ -662,22 +629,6 @@ export default function App() {
 
   const handleRevealClose = () => {
     setSlotRevealQueue((prev) => prev.slice(1));
-  };
-
-  const cardRevealQueue = state.pendingReveals;
-  const activeCardRevealId = activeRevealSlot ? null : cardRevealQueue[0] ?? null;
-  const activeCardReveal = activeCardRevealId ? state.cards[activeCardRevealId] ?? null : null;
-
-  useEffect(() => {
-    if (activeCardRevealId && !activeCardReveal) {
-      acknowledgeCardReveal(activeCardRevealId);
-    }
-  }, [acknowledgeCardReveal, activeCardReveal, activeCardRevealId]);
-
-  const handleCardRevealClose = () => {
-    if (activeCardRevealId) {
-      acknowledgeCardReveal(activeCardRevealId);
-    }
   };
 
   const handCards = useMemo(
@@ -865,9 +816,6 @@ export default function App() {
           {slots.map((slot) => {
             const occupant = slot.occupantId ? state.cards[slot.occupantId] ?? null : null;
             const assistant = slot.assistantId ? state.cards[slot.assistantId] ?? null : null;
-            const attachments = slot.attachedCardIds
-              .map((cardId) => state.cards[cardId])
-              .filter((card): card is CardInstance => Boolean(card));
             const isHeroInSlot = Boolean(
               (occupant && occupant.id === state.heroCardId) ||
                 (assistant && assistant.id === state.heroCardId)
@@ -878,7 +826,6 @@ export default function App() {
                 slot={slot}
                 occupant={occupant}
                 assistant={assistant}
-                attachments={attachments}
                 isHeroInSlot={isHeroInSlot}
                 onClick={handleSlotClick}
                 onActivate={activateSlot}
@@ -966,10 +913,6 @@ export default function App() {
 
       {activeRevealSlot ? (
         <SlotRevealOverlay slot={activeRevealSlot} onClose={handleRevealClose} />
-      ) : null}
-
-      {activeCardReveal ? (
-        <CardRevealOverlay card={activeCardReveal} onClose={handleCardRevealClose} />
       ) : null}
 
       {!isDesktop && isChronicleOpen ? (
