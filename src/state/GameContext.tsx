@@ -715,15 +715,25 @@ function completeManorExploration(state: GameState, slotId: string, log: string[
   const revealedRooms: string[] = [];
 
   if (missingKeys.length > 0) {
-    const selectedIndex = Math.floor(Math.random() * missingKeys.length);
-    const selectedKey = missingKeys[selectedIndex];
+    const selectedKey = missingKeys[0];
     const template = SLOT_TEMPLATES[selectedKey];
     const newRoom = instantiateSlot(template);
     updatedSlots[newRoom.id] = newRoom;
     revealedRooms.push(newRoom.name);
   }
 
-  delete updatedSlots[slotId];
+  const shouldRemoveManor = missingKeys.length <= 1;
+
+  if (shouldRemoveManor) {
+    delete updatedSlots[slotId];
+  } else {
+    updatedSlots[slotId] = {
+      ...currentSlot,
+      occupantId: null,
+      pendingAction: null,
+      lockedUntil: null
+    };
+  }
 
   let updatedCards = state.cards;
   let updatedHand = state.hand;
@@ -736,15 +746,15 @@ function completeManorExploration(state: GameState, slotId: string, log: string[
   }
 
   let nextLog = log;
+  const explorerName = persona ? persona.name : 'Your retinue';
+
   if (revealedRooms.length > 0) {
     const roomsFragment = revealedRooms.join(', ');
-    const explorerName = persona ? persona.name : 'Your retinue';
-    nextLog = appendLog(
-      log,
-      `${explorerName} charts the manor’s halls, revealing ${roomsFragment} before the manor’s entrance seals behind them.`
-    );
+    const summary = shouldRemoveManor
+      ? `${explorerName} charts the manor’s halls, revealing ${roomsFragment} before the manor’s entrance seals behind them.`
+      : `${explorerName} charts the manor’s halls, revealing ${roomsFragment}. More ruined chambers await discovery.`;
+    nextLog = appendLog(log, summary);
   } else {
-    const explorerName = persona ? persona.name : 'Your retinue';
     nextLog = appendLog(
       log,
       `${explorerName} finds no further chambers awaiting discovery as the manor’s entrance seals behind them.`
