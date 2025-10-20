@@ -703,6 +703,12 @@ export default function App() {
   function handleCardDragStart(cardId: string) {
     setDraggedCardId(cardId);
     setSelectedCardId(null);
+    if (!isDesktop && isHandOpen) {
+      const card = state.cards[cardId];
+      if (card?.location.area === 'hand') {
+        setIsHandOpen(false);
+      }
+    }
   }
 
   function handleCardDragEnd() {
