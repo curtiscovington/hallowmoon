@@ -437,6 +437,19 @@ function augmentJournalWithDream(journal: CardInstance, dreamTitle: string): Car
   return applyJournalEntries(journal, updatedEntries);
 }
 
+function createEmptyJournal(): CardInstance {
+  const template: CardTemplate = {
+    key: 'private-journal',
+    name: JOURNAL_CARD_NAME,
+    type: 'inspiration',
+    description: describeJournal([]),
+    traits: ['journal', 'dream-record'],
+    permanent: true
+  };
+  const journal = instantiateCard(template);
+  return applyJournalEntries(journal, []);
+}
+
 function createJournalFromDream(dream: CardInstance): CardInstance {
   const recordedTitle = extractDreamTitle(dream) || dream.name;
   const template: CardTemplate = {
@@ -1856,10 +1869,21 @@ function gameReducer(state: GameState, action: Action): GameState {
                   assistantId: null
                 }
               };
-              updatedLog = appendLog(
-                updatedLog,
-                `${occupant.name} restores ${restoredSlot.name}, ready for use.`
-              );
+
+              let completionLog = `${occupant.name} restores ${restoredSlot.name}, ready for use.`;
+
+              if (slot.repair.targetKey === 'study') {
+                const journal = createEmptyJournal();
+                const journalCard: CardInstance = { ...journal, location: { area: 'hand' } };
+                updatedCards = {
+                  ...updatedCards,
+                  [journalCard.id]: journalCard
+                };
+                updatedHand = addToHand(updatedHand, journalCard.id);
+                completionLog = `${occupant.name} restores ${restoredSlot.name}, uncovering ${journalCard.name}.`;
+              }
+
+              updatedLog = appendLog(updatedLog, completionLog);
             }
           } else {
             updatedSlots = {
