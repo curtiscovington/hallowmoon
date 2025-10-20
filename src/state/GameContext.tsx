@@ -714,8 +714,10 @@ function completeManorExploration(state: GameState, slotId: string, log: string[
   const updatedSlots: Record<string, Slot> = { ...state.slots };
   const revealedRooms: string[] = [];
 
-  for (const key of missingKeys) {
-    const template = SLOT_TEMPLATES[key];
+  if (missingKeys.length > 0) {
+    const selectedIndex = Math.floor(Math.random() * missingKeys.length);
+    const selectedKey = missingKeys[selectedIndex];
+    const template = SLOT_TEMPLATES[selectedKey];
     const newRoom = instantiateSlot(template);
     updatedSlots[newRoom.id] = newRoom;
     revealedRooms.push(newRoom.name);
