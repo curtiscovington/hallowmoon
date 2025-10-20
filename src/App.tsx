@@ -1,6 +1,8 @@
-import { DragEvent, useEffect, useId, useMemo, useState } from 'react';
+import { DragEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useGame } from './state/GameContext';
 import { CardInstance, Slot } from './state/types';
+import { SLOT_TYPE_INFO } from './constants/slotTypeInfo';
+import { SlotRevealOverlay } from './components/SlotRevealOverlay';
 
 const CARD_DRAG_TYPE = 'application/x-hallowmoon-card';
 
@@ -207,16 +209,6 @@ function describeSlotAcceptance(accepted: Slot['accepted']): string {
   }
 }
 
-const SLOT_TYPE_INFO: Record<Slot['type'], { label: string; icon: string }> = {
-  hearth: { label: 'Hearth', icon: '🔥' },
-  work: { label: 'Work', icon: '🛠' },
-  study: { label: 'Study', icon: '📚' },
-  ritual: { label: 'Ritual', icon: '🔮' },
-  expedition: { label: 'Expedition', icon: '🧭' },
-  manor: { label: 'Manor', icon: '🏚️' },
-  bedroom: { label: 'Bedroom', icon: '🛏️' }
-};
-
 function SlotView({
   slot,
   occupant,
@@ -400,6 +392,7 @@ function SlotView({
       className={slotClasses.join(' ')}
       data-collapsed={!showDetails}
       data-slot-type={slot.type}
+      data-slot-id={slot.id}
     >
       <header className="slot-card__header">
         <div className="slot-card__title-block">
@@ -574,6 +567,9 @@ export default function App() {
   const [isChronicleOpen, setIsChronicleOpen] = useState(false);
   const [isHandOpen, setIsHandOpen] = useState(isDesktop);
   const handPanelId = useId();
+  const [slotRevealQueue, setSlotRevealQueue] = useState<string[]>([]);
+  const previousSlotIdsRef = useRef<Set<string>>(new Set(Object.keys(state.slots)));
+  const autoPausedByRevealRef = useRef(false);
 
   useEffect(() => {
     if (isPaused) {
@@ -596,8 +592,44 @@ export default function App() {
   }, [advanceTime, cycleDurationMs, isPaused, speed]);
 
   useEffect(() => {
-    setTimeScale(speed);
-  }, [setTimeScale, speed]);
+    setTimeScale(isPaused ? 0 : speed);
+  }, [isPaused, setTimeScale, speed]);
+
+  useEffect(() => {
+    const previousIds = previousSlotIdsRef.current;
+    const currentIds = Object.keys(state.slots);
+    const newIds = currentIds.filter((id) => !previousIds.has(id));
+    previousSlotIdsRef.current = new Set(currentIds);
+
+    if (newIds.length > 0) {
+      setSlotRevealQueue((prev) => [...prev, ...newIds]);
+    }
+  }, [state.slots]);
+
+  useEffect(() => {
+    if (slotRevealQueue.length > 0) {
+      if (!isPaused) {
+        autoPausedByRevealRef.current = true;
+        setIsPaused(true);
+      }
+    } else if (autoPausedByRevealRef.current) {
+      autoPausedByRevealRef.current = false;
+      setIsPaused(false);
+    }
+  }, [isPaused, slotRevealQueue.length]);
+
+  const activeRevealSlotId = slotRevealQueue[0] ?? null;
+  const activeRevealSlot = activeRevealSlotId ? state.slots[activeRevealSlotId] ?? null : null;
+
+  useEffect(() => {
+    if (activeRevealSlotId && !activeRevealSlot) {
+      setSlotRevealQueue((prev) => prev.filter((id) => id !== activeRevealSlotId));
+    }
+  }, [activeRevealSlot, activeRevealSlotId]);
+
+  const handleRevealClose = () => {
+    setSlotRevealQueue((prev) => prev.slice(1));
+  };
 
   const handCards = useMemo(
     () =>
@@ -878,6 +910,10 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {activeRevealSlot ? (
+        <SlotRevealOverlay slot={activeRevealSlot} onClose={handleRevealClose} />
+      ) : null}
 
       {!isDesktop && isChronicleOpen ? (
         <div className="chronicle-drawer" role="dialog" aria-modal="true" aria-labelledby={chronicleTitleId}>
