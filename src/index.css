@@ -365,18 +365,19 @@ body {
 
 .slot-card__dropzone {
   border: 2px dashed rgba(157, 136, 255, 0.32);
-  border-radius: 1rem;
-  min-height: 130px;
-  padding: 0.75rem;
+  border-radius: 1.05rem;
+  min-height: 150px;
+  padding: clamp(0.65rem, 1.6vw, 0.9rem);
   background: rgba(120, 103, 205, 0.12);
-  display: grid;
-  gap: 0.4rem;
-  justify-items: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
   align-items: stretch;
   cursor: pointer;
   transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
   position: relative;
   overflow: hidden;
+  text-align: left;
 }
 
 .slot-card__dropzone[aria-disabled='true'] {
@@ -439,9 +440,90 @@ body {
   box-shadow: inset 0 0 0 2px rgba(255, 212, 123, 0.45);
 }
 
+.slot-card__dropzone[data-has-occupant='true'] {
+  padding: clamp(0.45rem, 1.2vw, 0.7rem);
+  border-radius: 1rem;
+}
+
 .slot-card__dropzone:focus-visible {
   outline: 2px solid rgba(204, 189, 255, 0.75);
   outline-offset: 3px;
+}
+
+.slot-card--drop-target {
+  box-shadow: 0 0 0 3px rgba(210, 197, 255, 0.45), 0 24px 44px rgba(16, 8, 36, 0.6);
+  transform: translateY(-2px);
+}
+
+.slot-card__stack {
+  position: relative;
+  display: block;
+  border-radius: 0.85rem;
+  isolation: isolate;
+}
+
+.slot-card__stack .card-token {
+  position: relative;
+  z-index: 4;
+}
+
+.slot-card__stack--layered {
+  padding: 0.45rem 0.4rem 0.75rem;
+}
+
+.slot-card__stack--layered .card-token {
+  border-radius: 0.95rem;
+}
+
+.slot-card__stack-layers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.slot-card__stack-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.95rem;
+  background: linear-gradient(170deg, rgba(92, 78, 148, 0.65), rgba(40, 28, 88, 0.55));
+  border: 1px solid rgba(204, 189, 255, 0.28);
+  box-shadow: 0 12px 24px rgba(12, 4, 34, 0.45);
+  transform: translate(
+      calc((var(--stack-index) - 1) * -8px),
+      calc((var(--stack-index) - 1) * -6px)
+    )
+    scale(calc(1 - (var(--stack-index) - 1) * 0.04));
+  opacity: 0.85;
+  z-index: calc(var(--stack-index));
+}
+
+.slot-card__stack-label {
+  position: absolute;
+  inset: auto 0.85rem 0.75rem 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 0.7rem;
+  background: rgba(16, 10, 36, 0.78);
+  border: 1px solid rgba(188, 176, 255, 0.22);
+  box-shadow: 0 10px 20px rgba(8, 3, 24, 0.5);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #e8e0ff;
+  pointer-events: none;
+}
+
+.slot-card__stack-label-action {
+  font-weight: 600;
+  color: #f9f5ff;
+}
+
+.slot-card__stack-label-count {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  color: rgba(228, 220, 255, 0.78);
 }
 
 .slot-card__placeholder {
@@ -470,24 +552,55 @@ body {
   letter-spacing: 0.08em;
 }
 
+.slot-card__stack-summary {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.slot-card__stack-summary-title {
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(224, 214, 255, 0.78);
+}
+
 .slot-card__attachments {
   list-style: none;
-  margin: 0.4rem 0 0;
+  margin: 0;
   padding: 0;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 0.35rem;
-  justify-content: center;
 }
 
 .slot-card__attachment {
-  background: rgba(26, 18, 54, 0.7);
-  border: 1px solid rgba(176, 158, 255, 0.35);
-  border-radius: 0.75rem;
-  padding: 0.2rem 0.6rem;
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
+  background: linear-gradient(160deg, rgba(33, 24, 68, 0.85), rgba(18, 12, 44, 0.95));
+  border: 1px solid rgba(176, 158, 255, 0.4);
+  border-radius: 0.8rem;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
   color: #f1ebff;
+  box-shadow: 0 12px 24px rgba(12, 4, 34, 0.45);
+  position: relative;
+  transform: translate(
+    calc((var(--stack-index) - 1) * 6px),
+    calc((var(--stack-index) - 1) * -6px)
+  );
+  z-index: calc(var(--stack-index));
+}
+
+.slot-card__attachment-name {
+  font-weight: 600;
+  display: block;
+}
+
+.slot-card__attachment-meta {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(220, 208, 255, 0.76);
 }
 
 .slot-card--collapsed {
@@ -507,6 +620,7 @@ body {
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: stretch;
+  justify-content: flex-end;
 }
 
 .slot-card__cta-button {
