@@ -279,6 +279,12 @@ function SlotView({
   const isSlotInteractive = slot.unlocked && !isSlotLocked;
   const upgradeDisabled =
     !isSlotInteractive || slot.state === 'damaged' || slot.upgradeCost === 0;
+
+  useEffect(() => {
+    if (!isSlotInteractive) {
+      setIsDragOver(false);
+    }
+  }, [isSlotInteractive]);
   const slotClasses = ['slot-card'];
   if (!slot.unlocked) {
     slotClasses.push('slot-card--locked');
@@ -431,7 +437,9 @@ function SlotView({
       return;
     }
     event.preventDefault();
-    setIsDragOver(true);
+    if (!isDragOver) {
+      setIsDragOver(true);
+    }
   }
 
   function handleDragOver(event: DragEvent<HTMLElement>) {
@@ -440,6 +448,9 @@ function SlotView({
     }
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
+    if (!isDragOver) {
+      setIsDragOver(true);
+    }
   }
 
   function handleDragLeave(event: DragEvent<HTMLElement>) {
@@ -450,6 +461,21 @@ function SlotView({
     if (nextTarget && event.currentTarget.contains(nextTarget)) {
       return;
     }
+
+    const { clientX, clientY } = event;
+    const hoveredElement =
+      typeof document !== 'undefined' && typeof document.elementFromPoint === 'function'
+        ? document.elementFromPoint(clientX, clientY)
+        : null;
+    if (hoveredElement && event.currentTarget.contains(hoveredElement)) {
+      return;
+    }
+    const targetElement = event.currentTarget as HTMLElement;
+    const rect = targetElement.getBoundingClientRect();
+    if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+      return;
+    }
+
     setIsDragOver(false);
   }
 
