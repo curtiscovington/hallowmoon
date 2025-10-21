@@ -55,7 +55,7 @@ function augmentJournalWithDream(journal: CardInstance, dreamTitle: string): Car
   return applyJournalEntries(journal, updatedEntries);
 }
 
-function createEmptyJournal(utils: SlotBehaviorUtils): CardInstance {
+export function createEmptyJournal(utils: SlotBehaviorUtils): CardInstance {
   const template = {
     key: 'private-journal',
     name: JOURNAL_CARD_NAME,
