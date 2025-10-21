@@ -1,4 +1,4 @@
-import { CardInstance, CardReward } from '../types';
+import { CardAbilityMetadata, CardInstance, CardReward } from '../types';
 
 export interface CardTemplate {
   key: string;
@@ -9,6 +9,7 @@ export interface CardTemplate {
   permanent: boolean;
   lifetime?: number;
   rewards?: CardReward;
+  ability?: CardAbilityMetadata;
 }
 
 export const HERO_TEMPLATE: CardTemplate = {
@@ -30,6 +31,10 @@ export const OPPORTUNITY_TEMPLATES: readonly CardTemplate[] = [
     traits: ['fleeting', 'memory'],
     permanent: false,
     lifetime: 2,
+    ability: {
+      onActivate: 'study:reward',
+      onExpire: 'expire:fading'
+    },
     rewards: {
       resources: { lore: 2, glimmer: 1 }
     }
@@ -42,6 +47,10 @@ export const OPPORTUNITY_TEMPLATES: readonly CardTemplate[] = [
     traits: ['fleeting', 'starlight'],
     permanent: false,
     lifetime: 3,
+    ability: {
+      onActivate: 'study:reward',
+      onExpire: 'expire:fading'
+    },
     rewards: {
       resources: { glimmer: 2 }
     }
@@ -55,6 +64,10 @@ export const OPPORTUNITY_TEMPLATES: readonly CardTemplate[] = [
     traits: ['fleeting', 'map'],
     permanent: false,
     lifetime: 4,
+    ability: {
+      onActivate: 'study:reward',
+      onExpire: 'expire:fading'
+    },
     rewards: {
       resources: { lore: 1 },
       discovery: {
@@ -81,6 +94,7 @@ export function createCardInstance(
     permanent: template.permanent,
     remainingTurns: template.permanent ? null : template.lifetime ?? null,
     rewards: template.rewards,
+    ability: template.ability,
     location
   };
 }
