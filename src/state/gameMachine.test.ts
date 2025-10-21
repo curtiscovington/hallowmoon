@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createGameMachine } from './gameMachine';
 import { SLOT_TEMPLATES } from './content';
+import { SLOT_BEHAVIORS } from './slots/behaviors';
 import { createCardInstance, type CardTemplate } from './content/cards';
 import type { Slot } from './types';
 
@@ -44,8 +45,8 @@ describe('createGameMachine', () => {
   });
 });
 
-function buildStudySlot(id: string): Slot {
-  const template = SLOT_TEMPLATES.study;
+function buildSlotFromTemplate(templateKey: keyof typeof SLOT_TEMPLATES, id: string): Slot {
+  const template = SLOT_TEMPLATES[templateKey];
   return {
     id,
     key: template.key,
@@ -58,14 +59,24 @@ function buildStudySlot(id: string): Slot {
     accepted: template.accepted,
     occupantId: null,
     assistantId: null,
-    unlocked: true,
-    state: 'active',
-    repair: null,
+    unlocked: template.unlocked ?? true,
+    state: template.state ?? 'active',
+    repair: template.repair
+      ? {
+          targetKey: template.repair.targetKey,
+          remaining: template.repair.time,
+          total: template.repair.time
+        }
+      : null,
     repairStarted: false,
     lockedUntil: null,
     pendingAction: null,
     attachedCardIds: []
   };
+}
+
+function buildStudySlot(id: string): Slot {
+  return buildSlotFromTemplate('study', id);
 }
 
 function createTestMachine() {
@@ -210,6 +221,91 @@ describe('card ability behaviors', () => {
     expect(state.cards[dreamCard.id]).toBeUndefined();
     expect(state.hand.includes(dreamCard.id)).toBe(false);
     expect(state.log.some((entry) => entry.includes('records') || entry.includes('expands'))).toBe(true);
+  });
+});
+
+describe('slot behavior registry', () => {
+  it('invokes registered behaviors and applies lock overrides', () => {
+    const machine = createGameMachine({ clock: () => 0 });
+    let state = machine.initialState();
+
+    const workSlot = buildSlotFromTemplate('work', 'mock-work-slot');
+    state = {
+      ...state,
+      slots: {
+        ...state.slots,
+        [workSlot.id]: workSlot
+      }
+    };
+
+    const heroId = state.heroCardId;
+    state = machine.reducer(state, {
+      type: 'MOVE_CARD_TO_SLOT',
+      cardId: heroId,
+      slotId: workSlot.id
+    });
+
+    const originalBehavior = SLOT_BEHAVIORS.work;
+    SLOT_BEHAVIORS.work = {
+      activate: ({ state: currentState, slot, log }, utils) => {
+        const nextLog = utils.appendLog(log, `Mock behavior activates ${slot.name}.`);
+        return {
+          state: { ...currentState, log: nextLog },
+          log: nextLog,
+          performed: true
+        };
+      },
+      getLockDurationMs: () => 5000
+    };
+
+    try {
+      state = machine.reducer(state, { type: 'ACTIVATE_SLOT', slotId: workSlot.id });
+    } finally {
+      if (originalBehavior) {
+        SLOT_BEHAVIORS.work = originalBehavior;
+      } else {
+        delete SLOT_BEHAVIORS.work;
+      }
+    }
+
+    const updatedSlot = state.slots[workSlot.id];
+    expect(updatedSlot.lockedUntil).toBe(5000);
+    expect(state.log.some((entry) => entry.includes('Mock behavior activates'))).toBe(true);
+  });
+
+  it('reports an error when no behavior is registered for a slot', () => {
+    const machine = createGameMachine({ clock: () => 0 });
+    let state = machine.initialState();
+
+    const workSlot = buildSlotFromTemplate('work', 'missing-behavior-slot');
+    state = {
+      ...state,
+      slots: {
+        ...state.slots,
+        [workSlot.id]: workSlot
+      }
+    };
+
+    const heroId = state.heroCardId;
+    state = machine.reducer(state, {
+      type: 'MOVE_CARD_TO_SLOT',
+      cardId: heroId,
+      slotId: workSlot.id
+    });
+
+    const originalBehavior = SLOT_BEHAVIORS.work;
+    delete SLOT_BEHAVIORS.work;
+
+    try {
+      state = machine.reducer(state, { type: 'ACTIVATE_SLOT', slotId: workSlot.id });
+    } finally {
+      if (originalBehavior) {
+        SLOT_BEHAVIORS.work = originalBehavior;
+      }
+    }
+
+    expect(state.slots[workSlot.id].lockedUntil).toBeNull();
+    expect(state.log.some((entry) => entry.includes('No behavior is defined'))).toBe(true);
   });
 });
 
