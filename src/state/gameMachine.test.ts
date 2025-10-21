@@ -222,6 +222,61 @@ describe('card ability behaviors', () => {
     expect(state.hand.includes(dreamCard.id)).toBe(false);
     expect(state.log.some((entry) => entry.includes('records') || entry.includes('expands'))).toBe(true);
   });
+
+  it('prevents permanent study subjects from being consumed', () => {
+    const machine = createTestMachine();
+    let state = machine.initialState();
+
+    const studySlot = buildStudySlot('study-slot-permanent');
+    state = {
+      ...state,
+      slots: {
+        ...state.slots,
+        [studySlot.id]: studySlot
+      }
+    };
+
+    const permanentTemplate = {
+      key: 'everlasting-tome',
+      name: 'Everlasting Tome',
+      type: 'relic',
+      description: 'An enduring record that should only grow with new insights.',
+      traits: ['immutable'],
+      permanent: true,
+      ability: { onActivate: 'study:reward' },
+      rewards: { resources: { lore: 3 } }
+    } satisfies CardTemplate;
+
+    const permanentCard = createCardInstance(permanentTemplate, 'everlasting-tome-card', { area: 'hand' });
+
+    state = {
+      ...state,
+      cards: {
+        ...state.cards,
+        [permanentCard.id]: permanentCard
+      },
+      hand: [...state.hand, permanentCard.id]
+    };
+
+    state = machine.reducer(state, {
+      type: 'MOVE_CARD_TO_SLOT',
+      cardId: permanentCard.id,
+      slotId: studySlot.id
+    });
+
+    const previousResources = { ...state.resources };
+
+    state = machine.reducer(state, {
+      type: 'ACTIVATE_SLOT',
+      slotId: studySlot.id
+    });
+
+    expect(state.cards[permanentCard.id]).toBeDefined();
+    expect(state.cards[permanentCard.id]?.location).toEqual({ area: 'slot', slotId: studySlot.id });
+    expect(state.slots[studySlot.id].occupantId).toBe(permanentCard.id);
+    expect(state.resources).toEqual(previousResources);
+    expect(state.log[0]).toContain('Permanent records resist');
+  });
 });
 
 describe('slot behavior registry', () => {

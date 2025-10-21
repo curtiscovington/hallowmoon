@@ -89,5 +89,6 @@ describe('GameContext manor restoration', () => {
       (card) => card.traits.includes('journal') && card.location.area === 'hand'
     );
     expect(journalCard?.name).toBe('Private Journal');
+    expect(result.current.state.pendingReveals).toContain(journalCard!.id);
   });
 });

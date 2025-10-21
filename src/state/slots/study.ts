@@ -187,6 +187,17 @@ export const studyBehavior: SlotBehavior = {
       };
     }
 
+    if (card.permanent) {
+      return {
+        state,
+        log: utils.appendLog(
+          log,
+          `Permanent records resist the archive's hunger. Pair ${card.name} with a fleeting dream to expand its insights.`
+        ),
+        performed: false
+      };
+    }
+
     let nextState: GameState = { ...state };
     let nextLog = log;
 
