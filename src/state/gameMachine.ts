@@ -930,6 +930,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       let updatedSlots = { ...state.slots };
       let updatedHand = [...state.hand];
       let updatedLog = appendLog(state.log, 'The candle gutters as time presses onward.');
+      let updatedPendingReveals = [...state.pendingReveals];
 
       for (const card of Object.values(state.cards)) {
         if (card.permanent || card.location.area === 'lost') {
@@ -977,6 +978,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
         }
         delete updatedCards[card.id];
+        updatedPendingReveals = updatedPendingReveals.filter((id) => id !== card.id);
         const expireMessage =
           expireAbility === 'expire:fading'
             ? `${card.name} fades before it can be used.`
@@ -999,7 +1001,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         cards: updatedCards,
         slots: updatedSlots,
         hand: updatedHand,
-        log: updatedLog
+        log: updatedLog,
+        pendingReveals: updatedPendingReveals
       };
 
       for (const slot of Object.values(updatedSlots)) {
@@ -1038,6 +1041,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
                   [journalCard.id]: journalCard
                 };
                 updatedHand = addToHand(updatedHand, journalCard.id);
+                updatedPendingReveals = [...updatedPendingReveals, journalCard.id];
                 completionLog = `${occupant.name} restores ${restoredSlot.name}, uncovering ${journalCard.name}.`;
               }
 
@@ -1068,7 +1072,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         cards: updatedCards,
         slots: updatedSlots,
         hand: updatedHand,
-        log: updatedLog
+        log: updatedLog,
+        pendingReveals: updatedPendingReveals
       };
 
       nextState = resolvePendingSlotActions(nextState, now);
