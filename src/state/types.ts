@@ -6,6 +6,20 @@ export interface Resources {
   glimmer: number;
 }
 
+export type CardAbilityKey =
+  | 'study:persona-reflection'
+  | 'study:reward'
+  | 'study:dream-record'
+  | 'assist:persona'
+  | 'assist:journal'
+  | 'expire:fading';
+
+export interface CardAbilityMetadata {
+  onActivate?: CardAbilityKey;
+  onAssist?: CardAbilityKey;
+  onExpire?: CardAbilityKey;
+}
+
 export type CardArchetype = 'persona' | 'inspiration' | 'relic' | 'task';
 
 export interface DiscoverySeed {
@@ -34,6 +48,7 @@ export interface CardInstance {
   permanent: boolean;
   remainingTurns: number | null;
   rewards?: CardReward;
+  ability?: CardAbilityMetadata;
   location: CardLocation;
 }
 

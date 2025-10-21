@@ -12,6 +12,7 @@ import {
 import { createCardInstance } from './content/cards';
 import { buildStoryLog } from '../content/storyBeats';
 import { formatDurationLabel } from '../utils/time';
+import { resolveAbilityKey, resolveCardAbility } from './cards/abilities';
 
 type RandomSource = () => number;
 type Clock = () => number;
@@ -98,11 +99,11 @@ function randomFrom<T>(options: readonly T[]): T {
 }
 
 function isDreamCard(card: CardInstance | undefined): card is CardInstance {
-  return Boolean(card && card.traits.includes('dream'));
+  return Boolean(card && resolveAbilityKey(card, 'onActivate') === 'study:dream-record');
 }
 
 function isJournalCard(card: CardInstance | undefined): card is CardInstance {
-  return Boolean(card && card.traits.includes('journal'));
+  return Boolean(card && resolveAbilityKey(card, 'onAssist') === 'assist:journal');
 }
 
 function extractDreamTitle(dream: CardInstance): string {
@@ -118,7 +119,11 @@ function createDreamCard(): CardInstance {
     description: `A fleeting vision of ${title.toLowerCase()}. Document it before it fades.`,
     traits: ['dream', 'fleeting'],
     permanent: false,
-    lifetime: 3
+    lifetime: 3,
+    ability: {
+      onActivate: 'study:dream-record',
+      onExpire: 'expire:fading'
+    }
   };
   return instantiateCard(template);
 }
@@ -163,7 +168,8 @@ function applyJournalEntries(journal: CardInstance, entries: string[]): CardInst
     description: describeJournal(entries),
     traits: normalizeJournalTraits(journal, entries),
     permanent: true,
-    remainingTurns: null
+    remainingTurns: null,
+    ability: journal.ability ?? { onAssist: 'assist:journal' }
   };
 }
 
@@ -181,7 +187,10 @@ function createEmptyJournal(): CardInstance {
     type: 'inspiration',
     description: describeJournal([]),
     traits: ['journal', 'dream-record'],
-    permanent: true
+    permanent: true,
+    ability: {
+      onAssist: 'assist:journal'
+    }
   };
   const journal = instantiateCard(template);
   return applyJournalEntries(journal, []);
@@ -195,7 +204,10 @@ function createJournalFromDream(dream: CardInstance): CardInstance {
     type: 'inspiration',
     description: describeJournal([recordedTitle]),
     traits: ['journal', 'dream-record', `dream:${recordedTitle}`],
-    permanent: true
+    permanent: true,
+    ability: {
+      onAssist: 'assist:journal'
+    }
   };
   const journal = instantiateCard(template);
   return applyJournalEntries(journal, [recordedTitle]);
@@ -775,8 +787,17 @@ function studySlot(state: GameState, slot: Slot, log: string[]): SlotActionResul
     .map((id) => state.cards[id])
     .filter((attached): attached is CardInstance => Boolean(attached));
 
-  if (isDreamCard(card) && assistant && assistant.type === 'persona') {
-    const existingJournal = attachmentCards.find((attached) => attached.traits.includes('journal'));
+  const occupantAbility = resolveCardAbility(card);
+  const assistantAbility = assistant ? resolveCardAbility(assistant) : null;
+
+  if (
+    occupantAbility.onActivate === 'study:dream-record' &&
+    assistant &&
+    assistantAbility?.onAssist === 'assist:persona'
+  ) {
+    const existingJournal = attachmentCards.find(
+      (attached) => resolveAbilityKey(attached, 'onAssist') === 'assist:journal'
+    );
     const updatedCards = { ...state.cards };
     delete updatedCards[card.id];
 
@@ -841,7 +862,7 @@ function studySlot(state: GameState, slot: Slot, log: string[]): SlotActionResul
     };
   }
 
-  if (card.type === 'persona') {
+  if (occupantAbility.onActivate === 'study:persona-reflection') {
     const loreGain = 1;
     const nextResources = applyResources(state.resources, { lore: loreGain });
     return {
@@ -1180,7 +1201,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (
         slot.type === 'study' &&
         currentOccupant &&
-        currentOccupant.type === 'persona' &&
+        resolveAbilityKey(currentOccupant, 'onAssist') === 'assist:persona' &&
         isJournalCard(card) &&
         !currentAssistantId
       ) {
@@ -1211,7 +1232,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       if (
         slot.type === 'study' &&
         currentOccupant &&
-        currentOccupant.type === 'persona' &&
+        resolveAbilityKey(currentOccupant, 'onAssist') === 'assist:persona' &&
         isDreamCard(card) &&
         !currentAssistantId
       ) {
@@ -1244,7 +1265,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         currentOccupant &&
         isDreamCard(currentOccupant) &&
         currentAssistant &&
-        currentAssistant.type === 'persona' &&
+        resolveAbilityKey(currentAssistant, 'onAssist') === 'assist:persona' &&
         isJournalCard(card)
       ) {
         updatedCards = {
@@ -1280,7 +1301,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         slot.type === 'study' &&
         currentOccupant &&
         isDreamCard(currentOccupant) &&
-        card.type === 'persona' &&
+        resolveAbilityKey(card, 'onAssist') === 'assist:persona' &&
         (!currentAssistant || currentAssistant.id === card.id)
       ) {
         updatedCards = {
@@ -1309,7 +1330,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         currentOccupant &&
         isJournalCard(currentOccupant) &&
         currentAssistant &&
-        currentAssistant.type === 'persona' &&
+        resolveAbilityKey(currentAssistant, 'onAssist') === 'assist:persona' &&
         isDreamCard(card)
       ) {
         const nextAttachments = ensureAttachmentIds([
@@ -1530,6 +1551,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         if (card.permanent || card.location.area === 'lost') {
           continue;
         }
+        const expireAbility = resolveCardAbility(card).onExpire;
         const remaining = (card.remainingTurns ?? 0) - 1;
         if (remaining <= 0) {
           if (card.location.area === 'hand') {
@@ -1571,7 +1593,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
         }
         delete updatedCards[card.id];
-        updatedLog = appendLog(updatedLog, `${card.name} fades before it can be used.`);
+        const expireMessage =
+          expireAbility === 'expire:fading'
+            ? `${card.name} fades before it can be used.`
+            : `${card.name} fades before it can be used.`;
+        updatedLog = appendLog(updatedLog, expireMessage);
         } else {
           updatedCards = {
             ...updatedCards,
