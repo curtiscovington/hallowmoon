@@ -9,6 +9,7 @@ import {
 } from './content';
 import { buildStoryLog } from '../content/storyBeats';
 import { formatDurationLabel } from '../utils/time';
+import { resolveCardAbility } from './cards/abilities';
 
 import {
   addToHand,
@@ -673,6 +674,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         if (card.permanent || card.location.area === 'lost') {
           continue;
         }
+        const expireAbility = resolveCardAbility(card).onExpire;
         const remaining = (card.remainingTurns ?? 0) - 1;
         if (remaining <= 0) {
           if (card.location.area === 'hand') {
@@ -714,7 +716,11 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }
         }
         delete updatedCards[card.id];
-        updatedLog = appendLog(updatedLog, `${card.name} fades before it can be used.`);
+        const expireMessage =
+          expireAbility === 'expire:fading'
+            ? `${card.name} fades before it can be used.`
+            : `${card.name} fades before it can be used.`;
+        updatedLog = appendLog(updatedLog, expireMessage);
         } else {
           updatedCards = {
             ...updatedCards,

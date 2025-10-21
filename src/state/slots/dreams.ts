@@ -1,5 +1,6 @@
 import { CardInstance } from '../types';
 import { CardTemplate } from '../content';
+import { resolveAbilityKey } from '../cards/abilities';
 import { instantiateCard, randomFrom } from './shared';
 
 const DREAM_TITLES = [
@@ -14,11 +15,11 @@ const DREAM_TITLES = [
 const JOURNAL_CARD_NAME = 'Private Journal';
 
 export function isDreamCard(card: CardInstance | undefined): card is CardInstance {
-  return Boolean(card && card.traits.includes('dream'));
+  return Boolean(card && resolveAbilityKey(card, 'onActivate') === 'study:dream-record');
 }
 
 export function isJournalCard(card: CardInstance | undefined): card is CardInstance {
-  return Boolean(card && card.traits.includes('journal'));
+  return Boolean(card && resolveAbilityKey(card, 'onAssist') === 'assist:journal');
 }
 
 export function extractDreamTitle(dream: CardInstance): string {
@@ -34,7 +35,11 @@ export function createDreamCard(): CardInstance {
     description: `A fleeting vision of ${title.toLowerCase()}. Document it before it fades.`,
     traits: ['dream', 'fleeting'],
     permanent: false,
-    lifetime: 3
+    lifetime: 3,
+    ability: {
+      onActivate: 'study:dream-record',
+      onExpire: 'expire:fading'
+    }
   };
   return instantiateCard(template);
 }
@@ -79,7 +84,8 @@ function applyJournalEntries(journal: CardInstance, entries: string[]): CardInst
     description: describeJournal(entries),
     traits: normalizeJournalTraits(journal, entries),
     permanent: true,
-    remainingTurns: null
+    remainingTurns: null,
+    ability: journal.ability ?? { onAssist: 'assist:journal' }
   };
 }
 
@@ -97,7 +103,10 @@ export function createEmptyJournal(): CardInstance {
     type: 'inspiration',
     description: describeJournal([]),
     traits: ['journal', 'dream-record'],
-    permanent: true
+    permanent: true,
+    ability: {
+      onAssist: 'assist:journal'
+    }
   };
   const journal = instantiateCard(template);
   return applyJournalEntries(journal, []);
@@ -111,7 +120,10 @@ export function createJournalFromDream(dream: CardInstance): CardInstance {
     type: 'inspiration',
     description: describeJournal([recordedTitle]),
     traits: ['journal', 'dream-record', `dream:${recordedTitle}`],
-    permanent: true
+    permanent: true,
+    ability: {
+      onAssist: 'assist:journal'
+    }
   };
   const journal = instantiateCard(template);
   return applyJournalEntries(journal, [recordedTitle]);

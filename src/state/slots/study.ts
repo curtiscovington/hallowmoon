@@ -1,9 +1,10 @@
 import { SLOT_TEMPLATES } from '../content';
+import { resolveAbilityKey, resolveCardAbility } from '../cards/abilities';
 import { DiscoverySeed, GameState, Slot } from '../types';
 import { now } from '../runtime';
 import { SlotBehavior } from './behaviors';
 import { appendLog, applyResources, instantiateSlot, removeFromHand } from './shared';
-import { augmentJournalWithDream, createJournalFromDream, extractDreamTitle, isDreamCard, isJournalCard } from './dreams';
+import { augmentJournalWithDream, createJournalFromDream, extractDreamTitle, isJournalCard } from './dreams';
 
 function maybeUnlockExpeditionSlot(state: GameState): GameState {
   const hasSlot = Object.values(state.slots).some((entry) => entry.type === 'expedition');
@@ -74,8 +75,17 @@ const studyBehavior: SlotBehavior = {
       .map((id) => state.cards[id])
       .filter((attached): attached is NonNullable<typeof attached> => Boolean(attached));
 
-    if (isDreamCard(card) && assistant && assistant.type === 'persona') {
-      const existingJournal = attachmentCards.find((attached) => attached.traits.includes('journal'));
+    const occupantAbility = resolveCardAbility(card);
+    const assistantAbility = assistant ? resolveCardAbility(assistant) : null;
+
+    if (
+      occupantAbility.onActivate === 'study:dream-record' &&
+      assistant &&
+      assistantAbility?.onAssist === 'assist:persona'
+    ) {
+      const existingJournal = attachmentCards.find(
+        (attached) => resolveAbilityKey(attached, 'onAssist') === 'assist:journal'
+      );
       const updatedCards = { ...state.cards };
       delete updatedCards[card.id];
 
