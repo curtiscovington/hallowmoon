@@ -25,6 +25,11 @@ export function applyResources(current: Resources, delta: Partial<Resources>): R
   };
 }
 
+export interface SlotCompletionResult {
+  state: GameState;
+  log: string[];
+}
+
 export type InstantiateLocation = CardLocation;
 
 export function createCardId(templateKey: string, random = getRandomSource()): string {
@@ -93,4 +98,84 @@ export function spawnOpportunity(
   const nextLog = appendLog(log, `${card.name} drifts within reach, inviting attention.`);
 
   return { state: nextState, log: nextLog };
+}
+
+interface DeliverCardsParams {
+  state: GameState;
+  slot: Slot;
+  log: string[];
+  cardIds: string[];
+  reveal: boolean;
+}
+
+export function resolveDeliverCardsAction({
+  state,
+  slot,
+  log,
+  cardIds,
+  reveal
+}: DeliverCardsParams): SlotCompletionResult {
+  if (!cardIds.length) {
+    const clearedSlot: Slot = { ...slot, lockedUntil: null, pendingAction: null };
+    return {
+      state: {
+        ...state,
+        slots: {
+          ...state.slots,
+          [slot.id]: clearedSlot
+        }
+      },
+      log
+    };
+  }
+
+  let updatedState = state;
+  let updatedCards = { ...state.cards };
+  let updatedHand = [...state.hand];
+  let updatedLog = log;
+  const deliveredNames: string[] = [];
+
+  for (const cardId of cardIds) {
+    const card = updatedCards[cardId];
+    if (!card) {
+      continue;
+    }
+
+    deliveredNames.push(card.name);
+    updatedCards = {
+      ...updatedCards,
+      [cardId]: { ...card, location: { area: 'hand' } }
+    };
+    updatedHand = addToHand(updatedHand, cardId, false);
+  }
+
+  if (deliveredNames.length > 0) {
+    const summary = `${slot.name} yields ${deliveredNames.join(', ')}.`;
+    updatedLog = appendLog(updatedLog, summary);
+  }
+
+  const clearedSlot: Slot = {
+    ...slot,
+    lockedUntil: null,
+    pendingAction: null
+  };
+
+  const updatedSlots = {
+    ...updatedState.slots,
+    [slot.id]: clearedSlot
+  };
+
+  updatedState = {
+    ...updatedState,
+    cards: updatedCards,
+    hand: updatedHand,
+    slots: updatedSlots,
+    log: updatedLog,
+    pendingReveals: reveal ? [...updatedState.pendingReveals, ...cardIds] : updatedState.pendingReveals
+  };
+
+  return {
+    state: updatedState,
+    log: updatedState.log
+  };
 }

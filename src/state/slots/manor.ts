@@ -2,7 +2,7 @@ import { formatDurationLabel } from '../../utils/time';
 import { SLOT_LOCK_BASE_MS, SLOT_TEMPLATES } from '../content';
 import { GameState, Slot } from '../types';
 import { SlotBehavior } from './behaviors';
-import { appendLog, instantiateSlot } from './shared';
+import { addToHand, appendLog, instantiateSlot, SlotCompletionResult } from './shared';
 
 export const MANOR_ROOM_TEMPLATE_KEYS = [
   'damaged-sanctum',
@@ -146,6 +146,77 @@ const manorBehavior: SlotBehavior = {
     return undefined;
   }
 };
+
+export function completeManorExploration(state: GameState, slotId: string, log: string[]): SlotCompletionResult {
+  const currentSlot = state.slots[slotId];
+  if (!currentSlot) {
+    return { state, log };
+  }
+
+  const persona = currentSlot.occupantId ? state.cards[currentSlot.occupantId] ?? null : null;
+  const missingKeys = findMissingManorRooms(state);
+
+  const updatedSlots: Record<string, Slot> = { ...state.slots };
+  const revealedRooms: string[] = [];
+
+  if (missingKeys.length > 0) {
+    const selectedKey = missingKeys[0];
+    const template = SLOT_TEMPLATES[selectedKey];
+    const newRoom = instantiateSlot(template);
+    updatedSlots[newRoom.id] = newRoom;
+    revealedRooms.push(newRoom.name);
+  }
+
+  const shouldRemoveManor = missingKeys.length <= 1;
+
+  if (shouldRemoveManor) {
+    delete updatedSlots[slotId];
+  } else {
+    updatedSlots[slotId] = {
+      ...currentSlot,
+      occupantId: null,
+      pendingAction: null,
+      lockedUntil: null
+    };
+  }
+
+  let updatedCards = state.cards;
+  let updatedHand = state.hand;
+  if (persona) {
+    updatedCards = {
+      ...state.cards,
+      [persona.id]: { ...persona, location: { area: 'hand' } }
+    };
+    updatedHand = addToHand(state.hand, persona.id);
+  }
+
+  let nextLog = log;
+  const explorerName = persona ? persona.name : 'Your retinue';
+
+  if (revealedRooms.length > 0) {
+    const roomsFragment = revealedRooms.join(', ');
+    const summary = shouldRemoveManor
+      ? `${explorerName} charts the manor’s halls, revealing ${roomsFragment} before the manor’s entrance seals behind them.`
+      : `${explorerName} charts the manor’s halls, revealing ${roomsFragment}. More ruined chambers await discovery.`;
+    nextLog = appendLog(log, summary);
+  } else {
+    nextLog = appendLog(
+      log,
+      `${explorerName} finds no further chambers awaiting discovery as the manor’s entrance seals behind them.`
+    );
+  }
+
+  return {
+    state: {
+      ...state,
+      slots: updatedSlots,
+      cards: updatedCards,
+      hand: updatedHand,
+      log: nextLog
+    },
+    log: nextLog
+  };
+}
 
 export function getPendingManorRooms(state: GameState): ManorRoomTemplateKey[] {
   return findMissingManorRooms(state);

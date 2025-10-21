@@ -17,14 +17,13 @@ import {
   instantiateCard,
   instantiateSlot,
   removeFromHand,
+  resolveDeliverCardsAction,
   spawnOpportunity
 } from './slots/shared';
 import { createEmptyJournal, isDreamCard, isJournalCard } from './slots/dreams';
-import { MANOR_ROOM_TEMPLATE_KEYS } from './slots/manor';
+import { completeManorExploration } from './slots/manor';
 import { getSlotBehavior, SlotActionResult, SlotBehaviorContext } from './slots/behaviors';
 import { Clock, RandomSource, getClock, getRandomSource, now, random, setClock, setRandomSource } from './runtime';
-
-type ManorRoomTemplateKey = (typeof MANOR_ROOM_TEMPLATE_KEYS)[number];
 
 function getSlotBaseLockDurationMs(
   slot: Slot,
@@ -114,86 +113,6 @@ function calculateUpgradeCost(slot: Slot): number {
   return slot.upgradeCost + (slot.level - 1) * 2;
 }
 
-function completeManorExploration(state: GameState, slotId: string, log: string[]): {
-  state: GameState;
-  log: string[];
-} {
-  const currentSlot = state.slots[slotId];
-  if (!currentSlot) {
-    return { state, log };
-  }
-
-  const persona = currentSlot.occupantId ? state.cards[currentSlot.occupantId] ?? null : null;
-  const missingKeys: ManorRoomTemplateKey[] = MANOR_ROOM_TEMPLATE_KEYS.filter((templateKey) => {
-    const template = SLOT_TEMPLATES[templateKey];
-    const restoredKey = template.repair ? SLOT_TEMPLATES[template.repair.targetKey].key : null;
-    return !Object.values(state.slots).some(
-      (existing) => existing.key === template.key || (restoredKey ? existing.key === restoredKey : false)
-    );
-  });
-
-  const updatedSlots: Record<string, Slot> = { ...state.slots };
-  const revealedRooms: string[] = [];
-
-  if (missingKeys.length > 0) {
-    const selectedKey = missingKeys[0];
-    const template = SLOT_TEMPLATES[selectedKey];
-    const newRoom = instantiateSlot(template);
-    updatedSlots[newRoom.id] = newRoom;
-    revealedRooms.push(newRoom.name);
-  }
-
-  const shouldRemoveManor = missingKeys.length <= 1;
-
-  if (shouldRemoveManor) {
-    delete updatedSlots[slotId];
-  } else {
-    updatedSlots[slotId] = {
-      ...currentSlot,
-      occupantId: null,
-      pendingAction: null,
-      lockedUntil: null
-    };
-  }
-
-  let updatedCards = state.cards;
-  let updatedHand = state.hand;
-  if (persona) {
-    updatedCards = {
-      ...state.cards,
-      [persona.id]: { ...persona, location: { area: 'hand' } }
-    };
-    updatedHand = addToHand(state.hand, persona.id);
-  }
-
-  let nextLog = log;
-  const explorerName = persona ? persona.name : 'Your retinue';
-
-  if (revealedRooms.length > 0) {
-    const roomsFragment = revealedRooms.join(', ');
-    const summary = shouldRemoveManor
-      ? `${explorerName} charts the manor’s halls, revealing ${roomsFragment} before the manor’s entrance seals behind them.`
-      : `${explorerName} charts the manor’s halls, revealing ${roomsFragment}. More ruined chambers await discovery.`;
-    nextLog = appendLog(log, summary);
-  } else {
-    nextLog = appendLog(
-      log,
-      `${explorerName} finds no further chambers awaiting discovery as the manor’s entrance seals behind them.`
-    );
-  }
-
-  return {
-    state: {
-      ...state,
-      slots: updatedSlots,
-      cards: updatedCards,
-      hand: updatedHand,
-      log: nextLog
-    },
-    log: nextLog
-  };
-}
-
 function resolvePendingSlotActions(state: GameState, now: number): GameState {
   let nextState = state;
   const slotIds = Object.keys(state.slots);
@@ -215,61 +134,19 @@ function resolvePendingSlotActions(state: GameState, now: number): GameState {
     switch (slot.pendingAction.type) {
       case 'explore-manor': {
         const result = completeManorExploration(nextState, slotId, nextState.log);
-        nextState = result.state;
+        nextState = { ...result.state, log: result.log };
         break;
       }
       case 'deliver-cards': {
         const { cardIds, reveal } = slot.pendingAction;
-        let updatedState = nextState;
-        let updatedCards = { ...updatedState.cards };
-        let updatedHand = [...updatedState.hand];
-        let updatedSlots = { ...updatedState.slots };
-        let updatedLog = updatedState.log;
-        const deliveredNames: string[] = [];
-
-        for (const cardId of cardIds) {
-          const card = updatedCards[cardId];
-          if (!card) {
-            continue;
-          }
-          deliveredNames.push(card.name);
-          updatedCards = {
-            ...updatedCards,
-            [cardId]: { ...card, location: { area: 'hand' } }
-          };
-          updatedHand = addToHand(updatedHand, cardId, false);
-        }
-
-        if (deliveredNames.length > 0) {
-          const summary = `${slot.name} yields ${deliveredNames.join(', ')}.`;
-          updatedLog = appendLog(updatedLog, summary);
-        }
-
-        const clearedSlot: Slot = {
-          ...slot,
-          lockedUntil: null,
-          pendingAction: null
-        };
-
-        updatedSlots = {
-          ...updatedSlots,
-          [slotId]: clearedSlot
-        };
-
-        const pendingReveals = reveal
-          ? [...updatedState.pendingReveals, ...cardIds]
-          : updatedState.pendingReveals;
-
-        updatedState = {
-          ...updatedState,
-          cards: updatedCards,
-          hand: updatedHand,
-          slots: updatedSlots,
-          log: updatedLog,
-          pendingReveals
-        };
-
-        nextState = updatedState;
+        const result = resolveDeliverCardsAction({
+          state: nextState,
+          slot,
+          log: nextState.log,
+          cardIds,
+          reveal
+        });
+        nextState = { ...result.state, log: result.log };
         break;
       }
       default:
