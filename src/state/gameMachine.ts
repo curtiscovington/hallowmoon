@@ -15,6 +15,7 @@ import { formatDurationLabel } from '../utils/time';
 import { resolveAbilityKey, resolveCardAbility } from './cards/abilities';
 import { SLOT_BEHAVIORS, type SlotActionResult, type SlotBehaviorUtils } from './slots/behaviors';
 import { isDreamCard, isJournalCard } from './slots/dreams';
+import { createEmptyJournal } from './slots/study';
 import { MANOR_ROOM_TEMPLATE_KEYS } from './slots/manor';
 
 type RandomSource = () => number;
@@ -1030,7 +1031,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
               let completionLog = `${occupant.name} restores ${restoredSlot.name}, ready for use.`;
 
               if (slot.repair.targetKey === 'study') {
-                const journal = createEmptyJournal();
+                const journal = createEmptyJournal(slotBehaviorUtils);
                 const journalCard: CardInstance = { ...journal, location: { area: 'hand' } };
                 updatedCards = {
                   ...updatedCards,
