@@ -1,64 +1,44 @@
-import { CardInstance, Discovery, DiscoverySeed, GameState, Resources, Slot, SlotRepair } from './types';
+import { CardInstance, GameState, Resources, Slot } from './types';
 import {
-  CardTemplate,
   HERO_TEMPLATE,
   OPPORTUNITY_TEMPLATES,
   SLOT_ACTION_COMPLETION_TOLERANCE_MS,
   SLOT_LOCK_BASE_MS,
   SLOT_LOCK_DURATIONS,
-  SLOT_TEMPLATES,
-  SlotTemplate
+  SLOT_TEMPLATES
 } from './content';
-import { createCardInstance } from './content/cards';
 import { buildStoryLog } from '../content/storyBeats';
 import { formatDurationLabel } from '../utils/time';
 
-type RandomSource = () => number;
-type Clock = () => number;
+import {
+  addToHand,
+  appendLog,
+  applyResources,
+  instantiateCard,
+  instantiateSlot,
+  removeFromHand,
+  spawnOpportunity
+} from './slots/shared';
+import { createEmptyJournal, isDreamCard, isJournalCard } from './slots/dreams';
+import { MANOR_ROOM_TEMPLATE_KEYS } from './slots/manor';
+import { getSlotBehavior, SlotActionResult, SlotBehaviorContext } from './slots/behaviors';
+import { Clock, RandomSource, getClock, getRandomSource, now, random, setClock, setRandomSource } from './runtime';
 
-let randomSource: RandomSource = Math.random;
-let clockNow: Clock = () => Date.now();
+type ManorRoomTemplateKey = (typeof MANOR_ROOM_TEMPLATE_KEYS)[number];
 
-function createCardId(templateKey: string): string {
-  return `${templateKey}-${randomSource().toString(36).slice(2, 8)}`;
-}
+function getSlotBaseLockDurationMs(
+  slot: Slot,
+  state?: GameState,
+  context?: SlotBehaviorContext
+): number {
+  const behavior = getSlotBehavior(slot.type);
+  if (behavior?.getLockDurationMs) {
+    const override = behavior.getLockDurationMs({ slot, state, context });
+    if (typeof override === 'number') {
+      return override;
+    }
+  }
 
-function instantiateCard(template: CardTemplate): CardInstance {
-  return createCardInstance(template, createCardId(template.key), { area: 'hand' });
-}
-
-function instantiateSlot(template: SlotTemplate, id?: string): Slot {
-  const repair: SlotRepair | null = template.repair
-    ? {
-        targetKey: template.repair.targetKey,
-        remaining: template.repair.time,
-        total: template.repair.time
-      }
-    : null;
-
-  return {
-    id: id ?? `slot-${template.key}`,
-    key: template.key,
-    name: template.name,
-    type: template.type,
-    description: template.description,
-    level: 1,
-    upgradeCost: template.upgradeCost,
-    traits: [...template.traits],
-    accepted: template.accepted,
-    occupantId: null,
-    assistantId: null,
-    unlocked: template.unlocked ?? true,
-    state: template.state ?? 'active',
-    repair,
-    repairStarted: false,
-    lockedUntil: null,
-    pendingAction: null,
-    attachedCardIds: []
-  };
-}
-
-function getSlotBaseLockDurationMs(slot: Slot): number {
   const base = SLOT_LOCK_DURATIONS[slot.type] ?? SLOT_LOCK_BASE_MS;
   if (slot.type === 'manor' && slot.state === 'damaged') {
     return base * 2;
@@ -66,139 +46,15 @@ function getSlotBaseLockDurationMs(slot: Slot): number {
   return base;
 }
 
-function getScaledSlotLockDurationMs(slot: Slot, timeScale: number): number {
-  const baseDuration = getSlotBaseLockDurationMs(slot);
+function getScaledSlotLockDurationMs(
+  slot: Slot,
+  timeScale: number,
+  state?: GameState,
+  context?: SlotBehaviorContext
+): number {
+  const baseDuration = getSlotBaseLockDurationMs(slot, state, context);
   const scale = Math.max(timeScale, 0.25);
   return Math.max(250, Math.round(baseDuration / scale));
-}
-
-const MANOR_ROOM_TEMPLATE_KEYS = [
-  'damaged-sanctum',
-  'damaged-scriptorium',
-  'damaged-archive',
-  'damaged-circle',
-  'damaged-bedroom'
-] as const;
-
-type ManorRoomTemplateKey = (typeof MANOR_ROOM_TEMPLATE_KEYS)[number];
-
-const DREAM_TITLES = [
-  'Silver Staircases',
-  'Echoing Halls',
-  'Frosted Lanterns',
-  'Lunar Choirs',
-  'Velvet Storms',
-  'Shattered Constellations'
-] as const;
-
-const JOURNAL_CARD_NAME = 'Private Journal';
-
-function randomFrom<T>(options: readonly T[]): T {
-  return options[Math.floor(randomSource() * options.length)];
-}
-
-function isDreamCard(card: CardInstance | undefined): card is CardInstance {
-  return Boolean(card && card.traits.includes('dream'));
-}
-
-function isJournalCard(card: CardInstance | undefined): card is CardInstance {
-  return Boolean(card && card.traits.includes('journal'));
-}
-
-function extractDreamTitle(dream: CardInstance): string {
-  return dream.name.replace(/^Fleeting Dream:\s*/, '');
-}
-
-function createDreamCard(): CardInstance {
-  const title = randomFrom(DREAM_TITLES);
-  const template: CardTemplate = {
-    key: 'fleeting-dream',
-    name: `Fleeting Dream: ${title}`,
-    type: 'inspiration',
-    description: `A fleeting vision of ${title.toLowerCase()}. Document it before it fades.`,
-    traits: ['dream', 'fleeting'],
-    permanent: false,
-    lifetime: 3
-  };
-  return instantiateCard(template);
-}
-
-function extractJournalDreams(journal: CardInstance): string[] {
-  return journal.traits
-    .filter((trait) => trait.startsWith('dream:'))
-    .map((trait) => trait.slice('dream:'.length));
-}
-
-function formatJournalDescription(entries: string[]): string {
-  if (entries.length === 0) {
-    return 'Blank pages await recorded dreams.';
-  }
-  if (entries.length === 1) {
-    return `Pages capture the dream of ${entries[0]}.`;
-  }
-  if (entries.length === 2) {
-    return `Entries chronicle the dreams of ${entries[0]} and ${entries[1]}.`;
-  }
-
-  const rest = entries.slice(0, -1).join(', ');
-  const last = entries[entries.length - 1];
-  return `Entries chronicle the dreams of ${rest}, and ${last}.`;
-}
-
-function describeJournal(entries: string[]): string {
-  return `A bound journal cataloguing lucid recollections. ${formatJournalDescription(entries)}`;
-}
-
-function normalizeJournalTraits(journal: CardInstance, entries: string[]): string[] {
-  const baseTraits = journal.traits.filter((trait) => !trait.startsWith('dream:'));
-  const dedupedBase = Array.from(new Set(baseTraits.filter((trait) => trait !== 'journal' && trait !== 'dream-record')));
-  const dreamTraits = entries.map((entry) => `dream:${entry}`);
-  return [...dedupedBase, 'journal', 'dream-record', ...dreamTraits];
-}
-
-function applyJournalEntries(journal: CardInstance, entries: string[]): CardInstance {
-  return {
-    ...journal,
-    name: JOURNAL_CARD_NAME,
-    description: describeJournal(entries),
-    traits: normalizeJournalTraits(journal, entries),
-    permanent: true,
-    remainingTurns: null
-  };
-}
-
-function augmentJournalWithDream(journal: CardInstance, dreamTitle: string): CardInstance {
-  const existingEntries = extractJournalDreams(journal);
-  const hasEntry = existingEntries.includes(dreamTitle);
-  const updatedEntries = hasEntry ? existingEntries : [...existingEntries, dreamTitle];
-  return applyJournalEntries(journal, updatedEntries);
-}
-
-function createEmptyJournal(): CardInstance {
-  const template: CardTemplate = {
-    key: 'private-journal',
-    name: JOURNAL_CARD_NAME,
-    type: 'inspiration',
-    description: describeJournal([]),
-    traits: ['journal', 'dream-record'],
-    permanent: true
-  };
-  const journal = instantiateCard(template);
-  return applyJournalEntries(journal, []);
-}
-
-function createJournalFromDream(dream: CardInstance): CardInstance {
-  const recordedTitle = extractDreamTitle(dream) || dream.name;
-  const template: CardTemplate = {
-    key: 'private-journal',
-    name: JOURNAL_CARD_NAME,
-    type: 'inspiration',
-    description: describeJournal([recordedTitle]),
-    traits: ['journal', 'dream-record', `dream:${recordedTitle}`],
-    permanent: true
-  };
-  const journal = instantiateCard(template);
-  return applyJournalEntries(journal, [recordedTitle]);
 }
 
 function baseResources(): Resources {
@@ -240,267 +96,22 @@ export type GameAction =
   | { type: 'SET_TIME_SCALE'; scale: number }
   | { type: 'ACKNOWLEDGE_CARD_REVEAL'; cardId: string };
 
-interface SlotActionResult {
-  state: GameState;
-  log: string[];
-  performed: boolean;
-}
-
-function appendLog(log: string[], message: string): string[] {
-  const next = [message, ...log];
-  return next.slice(0, 14);
-}
-
-function removeFromHand(hand: string[], cardId: string): string[] {
-  return hand.filter((id) => id !== cardId);
-}
-
-function addToHand(hand: string[], cardId: string, toFront = true): string[] {
-  const filtered = removeFromHand(hand, cardId);
-  return toFront ? [cardId, ...filtered] : [...filtered, cardId];
-}
-
-function isCardAllowedInSlot(card: CardInstance, slot: Slot): boolean {
+function isCardAllowedInSlot(state: GameState, card: CardInstance, slot: Slot): boolean {
   if (slot.accepted === 'persona-only') {
     return card.type === 'persona';
   }
   if (slot.accepted === 'non-persona') {
     return card.type !== 'persona';
   }
+  const behavior = getSlotBehavior(slot.type);
+  if (behavior?.acceptsCard) {
+    return behavior.acceptsCard({ state, slot, card });
+  }
   return true;
 }
 
 function calculateUpgradeCost(slot: Slot): number {
   return slot.upgradeCost + (slot.level - 1) * 2;
-}
-
-function applyResources(current: Resources, delta: Partial<Resources>): Resources {
-  return {
-    coin: Math.max(0, current.coin + (delta.coin ?? 0)),
-    lore: Math.max(0, current.lore + (delta.lore ?? 0)),
-    glimmer: Math.max(0, current.glimmer + (delta.glimmer ?? 0))
-  };
-}
-
-function maybeUnlockExpeditionSlot(state: GameState): GameState {
-  const hasSlot = Object.values(state.slots).some((slot) => slot.type === 'expedition');
-  if (hasSlot) {
-    return state;
-  }
-
-  const discovery = state.discoveries.find((entry) => entry.key === 'umbral-gate');
-  if (!discovery) {
-    return state;
-  }
-
-  const expeditionTemplate = SLOT_TEMPLATES.expedition;
-  const expeditionSlot = instantiateSlot(expeditionTemplate);
-  const updatedSlots = {
-    ...state.slots,
-    [expeditionSlot.id]: expeditionSlot
-  };
-
-  return {
-    ...state,
-    slots: updatedSlots,
-    log: appendLog(state.log, 'The Umbral Gate yawns open, offering expeditions into the Hollow Ways.')
-  };
-}
-
-function applyDiscovery(state: GameState, seed: DiscoverySeed): GameState {
-  const alreadyKnown = state.discoveries.some((entry) => entry.key === seed.key);
-  if (alreadyKnown) {
-    return state;
-  }
-
-  const discovery: Discovery = {
-    id: `${seed.key}-${clockNow().toString(36)}`,
-    key: seed.key,
-    name: seed.name,
-    description: seed.description,
-    cycle: state.cycle
-  };
-
-  const updatedState: GameState = {
-    ...state,
-    discoveries: [discovery, ...state.discoveries],
-    log: appendLog(state.log, `Discovery gained: ${seed.name}. ${seed.description}`)
-  };
-
-  return maybeUnlockExpeditionSlot(updatedState);
-}
-
-function spawnOpportunity(state: GameState, log: string[]): {
-  state: GameState;
-  log: string[];
-} {
-  const template = randomFrom(OPPORTUNITY_TEMPLATES);
-  const card = instantiateCard(template);
-
-  const nextState: GameState = {
-    ...state,
-    cards: {
-      ...state.cards,
-      [card.id]: card
-    },
-    hand: addToHand(state.hand, card.id, false)
-  };
-
-  const nextLog = appendLog(log, `${card.name} drifts within reach, inviting attention.`);
-
-  return { state: nextState, log: nextLog };
-}
-
-function workHearth(state: GameState, slot: Slot, log: string[]): SlotActionResult {
-  if (!slot.occupantId) {
-    return { state, log: appendLog(log, 'The sanctum waits for someone to rest within it.'), performed: false };
-  }
-
-  const card = state.cards[slot.occupantId];
-  if (!card || card.type !== 'persona') {
-    return {
-      state,
-      log: appendLog(log, 'Only a living persona can draw the sanctum’s calm.'),
-      performed: false
-    };
-  }
-
-  const loreGain = 1 + Math.floor(slot.level / 2);
-  const glimmerGain = slot.level >= 3 ? 1 : 0;
-
-  const nextResources = applyResources(state.resources, {
-    lore: loreGain,
-    glimmer: glimmerGain
-  });
-
-  const fragments = [`${loreGain} lore`];
-  if (glimmerGain > 0) {
-    fragments.push(`${glimmerGain} glimmer`);
-  }
-
-  const nextLog = appendLog(
-    log,
-    `${card.name} communes with the Veiled Sanctum, gaining ${fragments.join(' and ')}.`
-  );
-
-  return {
-    state: {
-      ...state,
-      resources: nextResources
-    },
-    log: nextLog,
-    performed: true
-  };
-}
-
-function workJob(state: GameState, slot: Slot, log: string[]): SlotActionResult {
-  if (!slot.occupantId) {
-    return {
-      state,
-      log: appendLog(log, 'Assign your persona to the job before attempting to work it.'),
-      performed: false
-    };
-  }
-  const card = state.cards[slot.occupantId];
-  if (!card || card.type !== 'persona') {
-    return {
-      state,
-      log: appendLog(log, 'Only a persona can interpret the ledgers of the scriptorium.'),
-      performed: false
-    };
-  }
-
-  const coinGain = 2 + slot.level;
-  const loreGain = slot.level >= 2 ? 1 : 0;
-  const nextResources = applyResources(state.resources, {
-    coin: coinGain,
-    lore: loreGain
-  });
-
-  const nextLog = appendLog(
-    log,
-    `${card.name} works the Moonlit Scriptorium, earning ${coinGain} coin${
-      loreGain > 0 ? ` and ${loreGain} lore` : ''
-    }.`
-  );
-
-  if (randomSource() < 0.4) {
-    const { state: spawnedState, log: spawnedLog } = spawnOpportunity(
-      { ...state, resources: nextResources },
-      nextLog
-    );
-    return { state: spawnedState, log: spawnedLog, performed: true };
-  }
-
-  return {
-    state: {
-      ...state,
-      resources: nextResources
-    },
-    log: nextLog,
-    performed: true
-  };
-}
-
-function exploreManor(state: GameState, slot: Slot, log: string[]): SlotActionResult {
-  if (!slot.occupantId) {
-    return {
-      state,
-      log: appendLog(log, 'Send a persona into the manor before attempting to explore it.'),
-      performed: false
-    };
-  }
-
-  const persona = state.cards[slot.occupantId];
-  if (!persona || persona.type !== 'persona') {
-    return { state, log: appendLog(log, 'Only a living persona can unveil the manor’s halls.'), performed: false };
-  }
-
-  const missingKeys: ManorRoomTemplateKey[] = MANOR_ROOM_TEMPLATE_KEYS.filter((templateKey) => {
-    const template = SLOT_TEMPLATES[templateKey];
-    const restoredKey = template.repair ? SLOT_TEMPLATES[template.repair.targetKey].key : null;
-    return !Object.values(state.slots).some(
-      (existing) => existing.key === template.key || (restoredKey ? existing.key === restoredKey : false)
-    );
-  });
-
-  if (missingKeys.length === 0) {
-    return {
-      state,
-      log: appendLog(log, 'The manor is quiet for now; every discovered room awaits restoration.'),
-      performed: false
-    };
-  }
-
-  if (slot.pendingAction) {
-    return {
-      state,
-      log: appendLog(log, `${persona.name} is already charting the manor’s halls.`),
-      performed: false
-    };
-  }
-
-  const updatedSlots: Record<string, Slot> = {
-    ...state.slots,
-    [slot.id]: {
-      ...slot,
-      pendingAction: { type: 'explore-manor' }
-    }
-  };
-
-  const nextLog = appendLog(
-    log,
-    `${persona.name} ventures deeper into ${slot.name}, mapping its passages. They will report back soon.`
-  );
-
-  return {
-    state: {
-      ...state,
-      slots: updatedSlots
-    },
-    log: nextLog,
-    performed: true
-  };
 }
 
 function completeManorExploration(state: GameState, slotId: string, log: string[]): {
@@ -669,334 +280,12 @@ function resolvePendingSlotActions(state: GameState, now: number): GameState {
   return nextState;
 }
 
-function repairManorRoom(state: GameState, slot: Slot, log: string[]): SlotActionResult {
-  if (!slot.repair) {
-    return { state, log, performed: false };
-  }
-
-  if (!slot.occupantId) {
-    return {
-      state,
-      log: appendLog(log, 'Assign a persona to clear the debris from this room.'),
-      performed: false
-    };
-  }
-
-  const persona = state.cards[slot.occupantId];
-  if (!persona || persona.type !== 'persona') {
-    return {
-      state,
-      log: appendLog(log, 'A persona must brave the dust and cobwebs to restore the room.'),
-      performed: false
-    };
-  }
-
-  const remainingMs = slot.repair.remaining * SLOT_LOCK_BASE_MS;
-  const message = slot.repairStarted
-    ? `${persona.name} continues restoring ${slot.name}. ≈ ${formatDurationLabel(remainingMs)} remain.`
-    : `${persona.name} begins restoring ${slot.name}. ≈ ${formatDurationLabel(remainingMs)} remain.`;
-
-  if (slot.repairStarted) {
-    return { state, log: appendLog(log, message), performed: false };
-  }
-
-  const updatedSlots = {
-    ...state.slots,
-    [slot.id]: {
-      ...slot,
-      repairStarted: true
-    }
-  };
-
-  return {
-    state: {
-      ...state,
-      slots: updatedSlots
-    },
-    log: appendLog(log, message),
-    performed: true
-  };
-}
-
-function bedroomSlot(state: GameState, slot: Slot, log: string[]): SlotActionResult {
-  if (!slot.occupantId) {
-    return { state, log: appendLog(log, 'Let a persona rest within the bedroom to invite a dream.'), performed: false };
-  }
-
-  const persona = state.cards[slot.occupantId];
-  if (!persona || persona.type !== 'persona') {
-    return { state, log: appendLog(log, 'Only a persona may slumber deeply enough to dream here.'), performed: false };
-  }
-
-  const dream = createDreamCard();
-  const stagedDream: CardInstance = { ...dream, location: { area: 'lost' } };
-
-  const updatedSlots = {
-    ...state.slots,
-    [slot.id]: {
-      ...slot,
-      pendingAction: {
-        type: 'deliver-cards',
-        cardIds: [stagedDream.id],
-        reveal: true
-      }
-    }
-  };
-
-  const nextState: GameState = {
-    ...state,
-    cards: {
-      ...state.cards,
-      [stagedDream.id]: stagedDream
-    },
-    slots: updatedSlots
-  };
-
-  const nextLog = appendLog(
-    log,
-    `${persona.name} slumbers in ${slot.name}. A dream will surface when their rest concludes.`
-  );
-
-  return { state: nextState, log: nextLog, performed: true };
-}
-
-function studySlot(state: GameState, slot: Slot, log: string[]): SlotActionResult {
-  if (!slot.occupantId) {
-    return { state, log: appendLog(log, 'Place a card upon the Night Archive to study it.'), performed: false };
-  }
-
-  const card = state.cards[slot.occupantId];
-  if (!card) {
-    return { state, log, performed: false };
-  }
-
-  const assistant = slot.assistantId ? state.cards[slot.assistantId] ?? null : null;
-  const attachmentCards = slot.attachedCardIds
-    .map((id) => state.cards[id])
-    .filter((attached): attached is CardInstance => Boolean(attached));
-
-  if (isDreamCard(card) && assistant && assistant.type === 'persona') {
-    const existingJournal = attachmentCards.find((attached) => attached.traits.includes('journal'));
-    const updatedCards = { ...state.cards };
-    delete updatedCards[card.id];
-
-    const stagedIds: string[] = [];
-    let nextLog = log;
-
-    if (existingJournal) {
-      const augmented = augmentJournalWithDream(existingJournal, extractDreamTitle(card) || card.name);
-      updatedCards[existingJournal.id] = { ...augmented, location: { area: 'lost' } };
-      stagedIds.push(existingJournal.id);
-      nextLog = appendLog(
-        log,
-        `${assistant.name} expands ${existingJournal.name} with ${card.name}. The entry will be ready once the study concludes.`
-      );
-    } else {
-      const journal = createJournalFromDream(card);
-      const journalCard: CardInstance = { ...journal, location: { area: 'lost' } };
-      updatedCards[journalCard.id] = journalCard;
-      stagedIds.push(journalCard.id);
-      nextLog = appendLog(
-        log,
-        `${assistant.name} records ${card.name}, preserving it within ${journalCard.name}. The entry will be ready once the study concludes.`
-      );
-    }
-
-    const cleanedAttachments = slot.attachedCardIds.filter((id) => {
-      if (existingJournal && id === existingJournal.id) {
-        return false;
-      }
-      return true;
-    });
-
-    const updatedSlots = {
-      ...state.slots,
-      [slot.id]: {
-        ...slot,
-        occupantId: assistant.id,
-        assistantId: null,
-        attachedCardIds: cleanedAttachments,
-        pendingAction: {
-          type: 'deliver-cards',
-          cardIds: stagedIds,
-          reveal: true
-        }
-      }
-    };
-
-    const updatedHand = removeFromHand(state.hand, card.id);
-
-    return {
-      state: {
-        ...state,
-        cards: {
-          ...updatedCards,
-          [assistant.id]: { ...assistant, location: { area: 'slot', slotId: slot.id } }
-        },
-        slots: updatedSlots,
-        hand: updatedHand
-      },
-      log: nextLog,
-      performed: true
-    };
-  }
-
-  if (card.type === 'persona') {
-    const loreGain = 1;
-    const nextResources = applyResources(state.resources, { lore: loreGain });
-    return {
-      state: {
-        ...state,
-        resources: nextResources
-      },
-      log: appendLog(log, `${card.name} reflects upon their path, gaining ${loreGain} lore.`),
-      performed: true
-    };
-  }
-
-  let nextState: GameState = { ...state };
-  let nextLog = log;
-
-  if (card.rewards?.resources) {
-    nextState = {
-      ...nextState,
-      resources: applyResources(nextState.resources, card.rewards.resources)
-    };
-    const fragments = Object.entries(card.rewards.resources)
-      .map(([key, value]) => `${value} ${key}`)
-      .join(' and ');
-    nextLog = appendLog(nextLog, `${card.name} is deciphered, yielding ${fragments}.`);
-  } else {
-    nextLog = appendLog(nextLog, `${card.name} reveals little before dissolving.`);
-  }
-
-  if (card.rewards?.discovery) {
-    nextState = applyDiscovery(nextState, card.rewards.discovery);
-    nextLog = nextState.log;
-  }
-
-  const updatedSlots = {
-    ...nextState.slots,
-    [slot.id]: {
-      ...slot,
-      occupantId: null,
-      assistantId: null,
-      attachedCardIds: []
-    }
-  };
-
-  const updatedCards = { ...nextState.cards };
-  delete updatedCards[card.id];
-
-  return {
-    state: {
-      ...nextState,
-      slots: updatedSlots,
-      cards: updatedCards,
-      hand: removeFromHand(nextState.hand, card.id)
-    },
-    log: nextLog,
-    performed: true
-  };
-}
-
-function ritualSlot(state: GameState, slot: Slot, log: string[]): SlotActionResult {
-  if (!slot.occupantId) {
-    return { state, log: appendLog(log, 'Seat your persona within the circle to conduct a rite.'), performed: false };
-  }
-  const card = state.cards[slot.occupantId];
-  if (!card || card.type !== 'persona') {
-    return {
-      state,
-      log: appendLog(log, 'A living persona must anchor the ritual.'),
-      performed: false
-    };
-  }
-
-  const loreCost = Math.max(2, 2 + slot.level - 1);
-  if (state.resources.lore < loreCost) {
-    return {
-      state,
-      log: appendLog(log, `You require ${loreCost} lore to empower the ritual.`),
-      performed: false
-    };
-  }
-
-  const glimmerGain = 1 + Math.floor(slot.level / 2);
-  const nextResources = applyResources(state.resources, {
-    lore: -loreCost,
-    glimmer: glimmerGain
-  });
-
-  const nextLog = appendLog(
-    log,
-    `${card.name} completes a rite, converting ${loreCost} lore into ${glimmerGain} glimmer.`
-  );
-
-  if (randomSource() < 0.35) {
-    const { state: spawnedState, log: spawnedLog } = spawnOpportunity(
-      { ...state, resources: nextResources },
-      nextLog
-    );
-    return { state: spawnedState, log: spawnedLog, performed: true };
-  }
-
-  return {
-    state: {
-      ...state,
-      resources: nextResources
-    },
-    log: nextLog,
-    performed: true
-  };
-}
-
-function expeditionSlot(state: GameState, slot: Slot, log: string[]): SlotActionResult {
-  if (!slot.occupantId) {
-    return { state, log: appendLog(log, 'A daring persona must step through the Umbral Gate.'), performed: false };
-  }
-  const card = state.cards[slot.occupantId];
-  if (!card || card.type !== 'persona') {
-    return { state, log: appendLog(log, 'Only your persona can brave the Umbral Gate.'), performed: false };
-  }
-
-  const glimmerCost = 1;
-  if (state.resources.glimmer < glimmerCost) {
-    return {
-      state,
-      log: appendLog(log, 'At least 1 glimmer is needed to light the path beyond the gate.'),
-      performed: false
-    };
-  }
-
-  const coinGain = 1 + slot.level;
-  const loreGain = 2 + slot.level;
-
-  let nextState: GameState = {
-    ...state,
-    resources: applyResources(state.resources, {
-      glimmer: -glimmerCost,
-      coin: coinGain,
-      lore: loreGain
-    })
-  };
-
-  let nextLog = appendLog(
-    log,
-    `${card.name} ventures beyond the Umbral Gate, returning with ${coinGain} coin and ${loreGain} lore.`
-  );
-
-  if (randomSource() < 0.5) {
-    const { state: spawnedState, log: spawnedLog } = spawnOpportunity(nextState, nextLog);
-    nextState = spawnedState;
-    nextLog = spawnedLog;
-  }
-
-  return { state: nextState, log: nextLog, performed: true };
-}
-
 function activateSlot(state: GameState, slotId: string): SlotActionResult {
-  const preparedState = resolvePendingSlotActions(state, clockNow());
+  const clock = getClock();
+  const randomSource = getRandomSource();
+  const context: SlotBehaviorContext = { random: randomSource, now: clock };
+
+  const preparedState = resolvePendingSlotActions(state, clock());
   const slot = preparedState.slots[slotId];
   if (!slot || !slot.unlocked) {
     return {
@@ -1006,9 +295,9 @@ function activateSlot(state: GameState, slotId: string): SlotActionResult {
     };
   }
 
-  const now = clockNow();
-  if (slot.lockedUntil && slot.lockedUntil > now) {
-    const remaining = slot.lockedUntil - now;
+  const currentTime = clock();
+  if (slot.lockedUntil && slot.lockedUntil > currentTime) {
+    const remaining = slot.lockedUntil - currentTime;
     const message = `${slot.name} is still resolving a previous action. ≈ ${formatDurationLabel(remaining)} remain.`;
     return {
       state: preparedState,
@@ -1017,40 +306,17 @@ function activateSlot(state: GameState, slotId: string): SlotActionResult {
     };
   }
 
-  const log = preparedState.log;
-
-  let result: SlotActionResult;
-
-  switch (slot.type) {
-    case 'hearth':
-      result = workHearth(preparedState, slot, log);
-      break;
-    case 'work':
-      result = workJob(preparedState, slot, log);
-      break;
-    case 'study':
-      result = studySlot(preparedState, slot, log);
-      break;
-    case 'ritual':
-      result = ritualSlot(preparedState, slot, log);
-      break;
-    case 'expedition':
-      result = expeditionSlot(preparedState, slot, log);
-      break;
-    case 'manor':
-      if (slot.state === 'damaged' && slot.repair) {
-        result = repairManorRoom(preparedState, slot, log);
-      } else {
-        result = exploreManor(preparedState, slot, log);
-      }
-      break;
-    case 'bedroom':
-      result = bedroomSlot(preparedState, slot, log);
-      break;
-    default:
-      result = { state: preparedState, log, performed: false };
+  const behavior = getSlotBehavior(slot.type);
+  if (!behavior) {
+    const message = `No behavior is registered for slot type ${slot.type}.`;
+    return {
+      state: preparedState,
+      log: appendLog(preparedState.log, message),
+      performed: false
+    };
   }
 
+  const result = behavior.activate({ state: preparedState, slot, log: preparedState.log, context });
   if (!result.performed) {
     return result;
   }
@@ -1060,10 +326,10 @@ function activateSlot(state: GameState, slotId: string): SlotActionResult {
     return result;
   }
 
-  const lockDuration = getScaledSlotLockDurationMs(refreshedSlot, result.state.timeScale);
+  const lockDuration = getScaledSlotLockDurationMs(refreshedSlot, result.state.timeScale, result.state, context);
   const lockedSlot: Slot = {
     ...refreshedSlot,
-    lockedUntil: clockNow() + lockDuration
+    lockedUntil: clock() + lockDuration
   };
 
   const updatedSlots = {
@@ -1096,7 +362,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         };
       }
 
-      if (!isCardAllowedInSlot(card, slot)) {
+      if (!isCardAllowedInSlot(state, card, slot)) {
         return {
           ...state,
           log: appendLog(state.log, `${card.name} is not suited for ${slot.name}.`)
@@ -1109,7 +375,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       if (card.location.area === 'slot') {
         const originSlot = state.slots[card.location.slotId];
-        if (originSlot && originSlot.lockedUntil && originSlot.lockedUntil > clockNow()) {
+        if (originSlot && originSlot.lockedUntil && originSlot.lockedUntil > now()) {
           return {
             ...state,
             log: appendLog(
@@ -1423,7 +689,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       if (card.location.area === 'slot') {
         const slot = state.slots[card.location.slotId];
-        if (slot && slot.lockedUntil && slot.lockedUntil > clockNow()) {
+        if (slot && slot.lockedUntil && slot.lockedUntil > now()) {
           return {
             ...state,
             log: appendLog(
@@ -1520,7 +786,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       };
     }
     case 'ADVANCE_TIME': {
-      const now = clockNow();
+      const currentTimestamp = now();
       let updatedCards = { ...state.cards };
       let updatedSlots = { ...state.slots };
       let updatedHand = [...state.hand];
@@ -1661,9 +927,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         log: updatedLog
       };
 
-      nextState = resolvePendingSlotActions(nextState, now);
+      nextState = resolvePendingSlotActions(nextState, currentTimestamp);
 
-      if (randomSource() < 0.65) {
+      if (random() < 0.65) {
         const spawnResult = spawnOpportunity(nextState, nextState.log);
         nextState = { ...spawnResult.state, log: spawnResult.log };
       }
@@ -1671,7 +937,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return nextState;
     }
     case 'RESOLVE_PENDING_SLOT_ACTIONS': {
-      return resolvePendingSlotActions(state, clockNow());
+      return resolvePendingSlotActions(state, now());
     }
     case 'SET_TIME_SCALE': {
       const nextScale = Math.max(0.25, action.scale);
@@ -1679,17 +945,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         return state;
       }
 
-      const now = clockNow();
+      const currentTimestamp = now();
       const adjustedSlots: Record<string, Slot> = {};
 
       for (const [slotId, slot] of Object.entries(state.slots)) {
-        if (slot.lockedUntil && slot.lockedUntil > now) {
-          const remaining = slot.lockedUntil - now;
+        if (slot.lockedUntil && slot.lockedUntil > currentTimestamp) {
+          const remaining = slot.lockedUntil - currentTimestamp;
           const baseRemaining = Math.round(remaining * state.timeScale);
           const scaledRemaining = Math.max(0, Math.round(baseRemaining / nextScale));
           adjustedSlots[slotId] = {
             ...slot,
-            lockedUntil: scaledRemaining > 0 ? now + scaledRemaining : now
+            lockedUntil: scaledRemaining > 0 ? currentTimestamp + scaledRemaining : currentTimestamp
           };
         } else {
           adjustedSlots[slotId] = slot;
@@ -1736,19 +1002,19 @@ export interface GameMachineConfig {
 
 export function createGameMachine(config: GameMachineConfig = {}): GameMachine {
   if (config.random) {
-    randomSource = config.random;
+    setRandomSource(config.random);
   }
   if (config.clock) {
-    clockNow = config.clock;
+    setClock(config.clock);
   }
 
   return {
     initialState,
     reducer: (state, action) => gameReducer(state, action),
-    resolvePendingActions: (state) => resolvePendingSlotActions(state, clockNow()),
+    resolvePendingActions: (state) => resolvePendingSlotActions(state, now()),
     getUpgradeCost: calculateUpgradeCost,
     getScaledLockDuration: getScaledSlotLockDurationMs,
-    now: () => clockNow()
+    now: () => now()
   };
 }
 

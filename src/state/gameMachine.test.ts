@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { createGameMachine } from './gameMachine';
+import { registerSlotBehavior, resetSlotBehaviors, unregisterSlotBehavior } from './slots/behaviors';
+
+afterEach(() => {
+  resetSlotBehaviors();
+});
 
 describe('createGameMachine', () => {
   it('uses injected random and clock when generating the initial state', () => {
@@ -38,6 +43,48 @@ describe('createGameMachine', () => {
 
     const resolved = machine.resolvePendingActions(state);
     expect(resolved).toEqual(state);
+  });
+
+  it('uses registered slot behaviors when activating slots', () => {
+    let currentTime = 1000;
+    const machine = createGameMachine({ clock: () => currentTime });
+    const state = machine.initialState();
+    const manorSlot = Object.values(state.slots).find((slot) => slot.type === 'manor');
+    expect(manorSlot).toBeDefined();
+
+    let activated = false;
+    registerSlotBehavior('manor', {
+      activate: ({ state: inputState, slot, log }) => {
+        activated = true;
+        return {
+          state: inputState,
+          log: ['custom-behavior', ...log],
+          performed: true
+        };
+      },
+      getLockDurationMs: () => 5000
+    });
+
+    const nextState = machine.reducer(state, { type: 'ACTIVATE_SLOT', slotId: manorSlot!.id });
+
+    expect(activated).toBe(true);
+    const refreshedSlot = nextState.slots[manorSlot!.id];
+    expect(refreshedSlot?.lockedUntil).toBe(currentTime + 5000);
+    expect(nextState.log).toContain('custom-behavior');
+  });
+
+  it('logs an error when a slot type has no registered behavior', () => {
+    const machine = createGameMachine();
+    const state = machine.initialState();
+    const manorSlot = Object.values(state.slots).find((slot) => slot.type === 'manor');
+    expect(manorSlot).toBeDefined();
+
+    unregisterSlotBehavior('manor');
+
+    const nextState = machine.reducer(state, { type: 'ACTIVATE_SLOT', slotId: manorSlot!.id });
+
+    expect(nextState.slots[manorSlot!.id].lockedUntil).toBeNull();
+    expect(nextState.log[0]).toBe('No behavior is registered for slot type manor.');
   });
 });
 
