@@ -14,6 +14,8 @@ export type CardAbilityKey =
   | 'assist:journal'
   | 'expire:fading';
 
+export type CardAbilityEvent = 'onActivate' | 'onAssist' | 'onExpire';
+
 export interface CardAbilityMetadata {
   onActivate?: CardAbilityKey;
   onAssist?: CardAbilityKey;

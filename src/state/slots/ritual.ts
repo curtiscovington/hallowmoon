@@ -1,23 +1,21 @@
 import type { SlotBehavior } from './behaviors';
+import { ensurePersonaOccupant } from './helpers';
 
 export const ritualBehavior: SlotBehavior = {
   activate({ state, slot, log }, utils) {
-    if (!slot.occupantId) {
-      return {
-        state,
-        log: utils.appendLog(log, 'Seat your persona within the circle to conduct a rite.'),
-        performed: false
-      };
+    const occupant = ensurePersonaOccupant(
+      { state, slot, log },
+      utils,
+      {
+        message: 'Seat your persona within the circle to conduct a rite.',
+        invalidMessage: 'A living persona must anchor the ritual.'
+      }
+    );
+    if ('result' in occupant) {
+      return occupant.result;
     }
 
-    const card = state.cards[slot.occupantId];
-    if (!card || card.type !== 'persona') {
-      return {
-        state,
-        log: utils.appendLog(log, 'A living persona must anchor the ritual.'),
-        performed: false
-      };
-    }
+    const card = occupant.card;
 
     const loreCost = Math.max(2, 2 + slot.level - 1);
     if (state.resources.lore < loreCost) {

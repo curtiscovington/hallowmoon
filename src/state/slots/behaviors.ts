@@ -27,9 +27,25 @@ export interface SlotBehaviorAcceptanceContext {
   slot: Slot;
 }
 
+export interface SlotCardPlacementContext {
+  state: GameState;
+  slot: Slot;
+  card: CardInstance;
+  occupant: CardInstance | null;
+  assistant: CardInstance | null;
+  attachments: CardInstance[];
+  log: string[];
+}
+
 export interface SlotBehaviorLabels {
   activation?: string;
   locked?: string;
+}
+
+export interface SlotCardPlacementResult {
+  state: GameState;
+  log: string[];
+  handled: boolean;
 }
 
 export interface SlotBehavior {
@@ -40,6 +56,10 @@ export interface SlotBehavior {
     context: SlotBehaviorAcceptanceContext,
     utils: SlotBehaviorUtils
   ) => boolean;
+  onCardPlaced?: (
+    context: SlotCardPlacementContext,
+    utils: SlotBehaviorUtils
+  ) => SlotCardPlacementResult;
   labels?: SlotBehaviorLabels;
 }
 

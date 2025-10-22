@@ -12,9 +12,13 @@ import {
 import { createCardInstance } from './content/cards';
 import { buildStoryLog } from '../content/storyBeats';
 import { formatDurationLabel } from '../utils/time';
-import { resolveAbilityKey, resolveCardAbility } from './cards/abilities';
-import { SLOT_BEHAVIORS, type SlotActionResult, type SlotBehaviorUtils } from './slots/behaviors';
-import { isDreamCard, isJournalCard } from './slots/dreams';
+import { resolveCardAbility } from './cards/abilities';
+import {
+  SLOT_BEHAVIORS,
+  type SlotActionResult,
+  type SlotBehaviorUtils,
+  type SlotCardPlacementContext
+} from './slots/behaviors';
 import { createEmptyJournal } from './slots/study';
 import { MANOR_ROOM_TEMPLATE_KEYS } from './slots/manor';
 
@@ -525,7 +529,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
       }
 
-      const updatedSlots: Record<string, Slot> = { ...state.slots };
+      let updatedSlots: Record<string, Slot> = { ...state.slots };
       let updatedCards: Record<string, CardInstance> = { ...state.cards };
       let updatedHand = [...state.hand];
       let updatedLog = state.log;
@@ -570,6 +574,55 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
       }
 
+      let workingState: GameState = {
+        ...state,
+        cards: updatedCards,
+        slots: updatedSlots,
+        hand: updatedHand,
+        log: updatedLog
+      };
+
+      const behavior = SLOT_BEHAVIORS[slot.type];
+
+      const buildPlacementContext = (snapshot: GameState): SlotCardPlacementContext | null => {
+        const slotSnapshot = snapshot.slots[slot.id];
+        if (!slotSnapshot) {
+          return null;
+        }
+        const occupant = slotSnapshot.occupantId ? snapshot.cards[slotSnapshot.occupantId] ?? null : null;
+        const assistant = slotSnapshot.assistantId ? snapshot.cards[slotSnapshot.assistantId] ?? null : null;
+        const attachments = slotSnapshot.attachedCardIds
+          .map((id) => snapshot.cards[id])
+          .filter((attached): attached is CardInstance => Boolean(attached));
+        const cardSnapshot = snapshot.cards[card.id] ?? card;
+
+        return {
+          state: snapshot,
+          slot: slotSnapshot,
+          card: cardSnapshot,
+          occupant,
+          assistant,
+          attachments,
+          log: snapshot.log
+        };
+      };
+
+      if (behavior?.onCardPlaced) {
+        const placementContext = buildPlacementContext(workingState);
+        if (placementContext) {
+          const placementResult = behavior.onCardPlaced(placementContext, slotBehaviorUtils);
+          workingState = { ...placementResult.state, log: placementResult.log };
+          if (placementResult.handled) {
+            return workingState;
+          }
+        }
+      }
+
+      updatedCards = workingState.cards;
+      updatedSlots = workingState.slots;
+      updatedHand = workingState.hand;
+      updatedLog = workingState.log;
+
       const targetSlot = updatedSlots[slot.id];
       const currentOccupantId = targetSlot.occupantId;
       const currentAssistantId = targetSlot.assistantId;
@@ -581,173 +634,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         .filter((attached): attached is CardInstance => Boolean(attached));
 
       const ensureAttachmentIds = (ids: string[]) => Array.from(new Set(ids));
-
-      if (
-        slot.type === 'study' &&
-        currentOccupant &&
-        resolveAbilityKey(currentOccupant, 'onAssist') === 'assist:persona' &&
-        isJournalCard(card) &&
-        !currentAssistantId
-      ) {
-        updatedCards = {
-          ...updatedCards,
-          [currentOccupant.id]: { ...currentOccupant, location: { area: 'slot', slotId: slot.id } },
-          [card.id]: { ...card, location: { area: 'slot', slotId: slot.id } }
-        };
-        updatedSlots[slot.id] = {
-          ...targetSlot,
-          occupantId: card.id,
-          assistantId: currentOccupant.id,
-          attachedCardIds: ensureAttachmentIds(currentAttachments.filter((id) => id !== card.id))
-        };
-        updatedLog = appendLog(
-          updatedLog,
-          `${card.name} is opened for ${currentOccupant.name}, ready to capture their studies.`
-        );
-        return {
-          ...state,
-          cards: updatedCards,
-          slots: updatedSlots,
-          hand: updatedHand,
-          log: updatedLog
-        };
-      }
-
-      if (
-        slot.type === 'study' &&
-        currentOccupant &&
-        resolveAbilityKey(currentOccupant, 'onAssist') === 'assist:persona' &&
-        isDreamCard(card) &&
-        !currentAssistantId
-      ) {
-        updatedCards = {
-          ...updatedCards,
-          [currentOccupant.id]: { ...currentOccupant, location: { area: 'slot', slotId: slot.id } },
-          [card.id]: { ...card, location: { area: 'slot', slotId: slot.id } }
-        };
-        updatedSlots[slot.id] = {
-          ...targetSlot,
-          occupantId: card.id,
-          assistantId: currentOccupant.id,
-          attachedCardIds: ensureAttachmentIds(currentAttachments.filter((id) => id !== card.id))
-        };
-        updatedLog = appendLog(
-          updatedLog,
-          `${card.name} is entrusted to ${currentOccupant.name} for study.`
-        );
-        return {
-          ...state,
-          cards: updatedCards,
-          slots: updatedSlots,
-          hand: updatedHand,
-          log: updatedLog
-        };
-      }
-
-      if (
-        slot.type === 'study' &&
-        currentOccupant &&
-        isDreamCard(currentOccupant) &&
-        currentAssistant &&
-        resolveAbilityKey(currentAssistant, 'onAssist') === 'assist:persona' &&
-        isJournalCard(card)
-      ) {
-        updatedCards = {
-          ...updatedCards,
-          [card.id]: { ...card, location: { area: 'slot', slotId: slot.id } }
-        };
-
-        const nextAttachments = ensureAttachmentIds([
-          ...currentAttachments.filter((id) => id !== card.id),
-          card.id
-        ]);
-
-        updatedSlots[slot.id] = {
-          ...targetSlot,
-          attachedCardIds: nextAttachments
-        };
-
-        updatedLog = appendLog(
-          updatedLog,
-          `${card.name} lies open for ${currentAssistant.name}, ready to capture ${currentOccupant.name}.`
-        );
-
-        return {
-          ...state,
-          cards: updatedCards,
-          slots: updatedSlots,
-          hand: updatedHand,
-          log: updatedLog
-        };
-      }
-
-      if (
-        slot.type === 'study' &&
-        currentOccupant &&
-        isDreamCard(currentOccupant) &&
-        resolveAbilityKey(card, 'onAssist') === 'assist:persona' &&
-        (!currentAssistant || currentAssistant.id === card.id)
-      ) {
-        updatedCards = {
-          ...updatedCards,
-          [card.id]: { ...card, location: { area: 'slot', slotId: slot.id } }
-        };
-        updatedSlots[slot.id] = {
-          ...targetSlot,
-          assistantId: card.id
-        };
-        updatedLog = appendLog(
-          updatedLog,
-          `${card.name} joins ${currentOccupant.name} to interpret the dream.`
-        );
-        return {
-          ...state,
-          cards: updatedCards,
-          slots: updatedSlots,
-          hand: updatedHand,
-          log: updatedLog
-        };
-      }
-
-      if (
-        slot.type === 'study' &&
-        currentOccupant &&
-        isJournalCard(currentOccupant) &&
-        currentAssistant &&
-        resolveAbilityKey(currentAssistant, 'onAssist') === 'assist:persona' &&
-        isDreamCard(card)
-      ) {
-        const nextAttachments = ensureAttachmentIds([
-          ...currentAttachments.filter((id) => id !== card.id && id !== currentOccupant.id),
-          currentOccupant.id
-        ]);
-
-        updatedCards = {
-          ...updatedCards,
-          [currentOccupant.id]: { ...currentOccupant, location: { area: 'slot', slotId: slot.id } },
-          [card.id]: { ...card, location: { area: 'slot', slotId: slot.id } }
-        };
-
-        updatedSlots[slot.id] = {
-          ...targetSlot,
-          occupantId: card.id,
-          assistantId: currentAssistant.id,
-          attachedCardIds: nextAttachments
-        };
-
-        updatedLog = appendLog(
-          updatedLog,
-          `${card.name} is placed for ${currentAssistant.name} to chronicle within ${currentOccupant.name}.`
-        );
-
-        return {
-          ...state,
-          cards: updatedCards,
-          slots: updatedSlots,
-          hand: updatedHand,
-          log: updatedLog
-        };
-      }
 
       if (currentOccupantId && currentOccupantId !== card.id) {
         const displacedUpdates: Record<string, CardInstance> = {};

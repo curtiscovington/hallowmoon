@@ -1,6 +1,5 @@
-import { CardAbilityKey, CardInstance } from '../types';
-
-export type CardAbilityEvent = 'onActivate' | 'onAssist' | 'onExpire';
+import { CARD_ABILITY_FALLBACKS, type CardAbilityCondition } from '../content/abilities';
+import { CardAbilityEvent, CardAbilityKey, CardInstance } from '../types';
 
 export interface ResolvedCardAbility {
   onActivate?: CardAbilityKey;
@@ -8,59 +7,38 @@ export interface ResolvedCardAbility {
   onExpire?: CardAbilityKey;
 }
 
-function resolveActivateAbility(card: CardInstance): CardAbilityKey | undefined {
-  if (card.ability?.onActivate) {
-    return card.ability.onActivate;
+function matchesCondition(card: CardInstance, condition: CardAbilityCondition): boolean {
+  switch (condition.type) {
+    case 'trait':
+      return card.traits.includes(condition.value);
+    case 'card-type':
+      return card.type === condition.value;
+    case 'has-rewards':
+      return Boolean(card.rewards) === condition.value;
+    case 'permanent':
+      return card.permanent === condition.value;
+    default:
+      return false;
   }
-
-  if (card.traits.includes('dream')) {
-    return 'study:dream-record';
-  }
-
-  if (card.type === 'persona') {
-    return 'study:persona-reflection';
-  }
-
-  if (card.rewards) {
-    return 'study:reward';
-  }
-
-  return undefined;
 }
 
-function resolveAssistAbility(card: CardInstance): CardAbilityKey | undefined {
-  if (card.ability?.onAssist) {
-    return card.ability.onAssist;
+function inferAbility(card: CardInstance, event: CardAbilityEvent): CardAbilityKey | undefined {
+  for (const fallback of CARD_ABILITY_FALLBACKS) {
+    if (fallback.event !== event) {
+      continue;
+    }
+    if (fallback.conditions.every((condition) => matchesCondition(card, condition))) {
+      return fallback.ability;
+    }
   }
-
-  if (card.traits.includes('journal')) {
-    return 'assist:journal';
-  }
-
-  if (card.type === 'persona') {
-    return 'assist:persona';
-  }
-
-  return undefined;
-}
-
-function resolveExpireAbility(card: CardInstance): CardAbilityKey | undefined {
-  if (card.ability?.onExpire) {
-    return card.ability.onExpire;
-  }
-
-  if (!card.permanent) {
-    return 'expire:fading';
-  }
-
   return undefined;
 }
 
 export function resolveCardAbility(card: CardInstance): ResolvedCardAbility {
   return {
-    onActivate: resolveActivateAbility(card),
-    onAssist: resolveAssistAbility(card),
-    onExpire: resolveExpireAbility(card)
+    onActivate: card.ability?.onActivate ?? inferAbility(card, 'onActivate'),
+    onAssist: card.ability?.onAssist ?? inferAbility(card, 'onAssist'),
+    onExpire: card.ability?.onExpire ?? inferAbility(card, 'onExpire')
   };
 }
 
@@ -68,6 +46,8 @@ export function resolveAbilityKey(
   card: CardInstance,
   event: CardAbilityEvent
 ): CardAbilityKey | undefined {
-  const ability = resolveCardAbility(card);
-  return ability[event];
+  if (card.ability?.[event]) {
+    return card.ability[event];
+  }
+  return inferAbility(card, event);
 }
