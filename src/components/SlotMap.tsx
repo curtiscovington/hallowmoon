@@ -13,25 +13,41 @@ import {
   MapSlotAnchor,
   findAnchorForSlot
 } from '../constants/mapDefinitions';
-import { Slot } from '../state/types';
+import type { CardInstance, Slot } from '../state/types';
+import { describeCardForStatus } from '../utils/slotActions';
+
+export interface SlotMapSlotSummary {
+  occupant: CardInstance | null;
+  assistant: CardInstance | null;
+  attachments: CardInstance[];
+  isHeroInSlot: boolean;
+  canExploreLocation: boolean;
+  isSlotInteractive: boolean;
+  isLocked: boolean;
+  actionLabel: string | null;
+  canActivate: boolean;
+  availabilityNote: string | null;
+}
 
 interface SlotMapProps {
   mapId: MapId;
   onMapChange: (mapId: MapId) => void;
   availableMaps: MapId[];
   slots: Slot[];
+  slotSummaries: Record<string, SlotMapSlotSummary>;
   selectedSlotId: string | null;
   onFocusSlot: (slotId: string) => void;
+  onOpenSlotDetails: (slotId: string) => void;
+  onActivateSlot: (slotId: string) => void;
   onDropCard: (cardId: string, slotId: string) => void;
-  draggedCardId: string | null;
-  pausedAt: number | null;
+  draggedCard: CardInstance | null;
 }
 
 interface MarkerData {
   slot: Slot;
   anchor: MapSlotAnchor;
+  summary: SlotMapSlotSummary | null;
   locked: boolean;
-  occupied: boolean;
   damaged: boolean;
   resolving: boolean;
 }
@@ -45,11 +61,13 @@ export function SlotMap({
   availableMaps,
   onMapChange,
   slots,
+  slotSummaries,
   selectedSlotId,
   onFocusSlot,
+  onOpenSlotDetails,
+  onActivateSlot,
   onDropCard,
-  draggedCardId,
-  pausedAt
+  draggedCard
 }: SlotMapProps) {
   const map = MAP_DEFINITIONS[mapId];
   const [scale, setScale] = useState(1);
@@ -65,33 +83,33 @@ export function SlotMap({
   } | null>(null);
 
   const markers = useMemo<MarkerData[]>(() => {
-    const now = Date.now();
-    const pausedElapsedMs = pausedAt !== null ? Math.max(0, now - pausedAt) : 0;
     return slots
       .map((slot) => {
         const anchor = findAnchorForSlot(map, slot.key);
         if (!anchor) {
           return null;
         }
-        const lockRemaining = slot.lockedUntil
-          ? Math.max(0, slot.lockedUntil - now + pausedElapsedMs)
-          : 0;
+        const summary = slotSummaries[slot.id] ?? null;
+        const locked = !slot.unlocked || Boolean(summary?.isLocked);
         return {
           slot,
           anchor,
-          locked: Boolean(slot.lockedUntil && lockRemaining > 0),
-          occupied: Boolean(slot.occupantId),
+          summary,
+          locked,
           damaged: slot.state === 'damaged',
           resolving: Boolean(slot.pendingAction)
         } satisfies MarkerData;
       })
       .filter((value): value is MarkerData => value !== null)
       .sort((a, b) => a.slot.name.localeCompare(b.slot.name));
-  }, [map, pausedAt, slots]);
+  }, [map, slotSummaries, slots]);
 
   const canDropOnSlot = useCallback(
-    (slot: Slot, locked: boolean) => {
-      return Boolean(!locked && slot.unlocked);
+    (slot: Slot, summary: SlotMapSlotSummary | null) => {
+      if (!summary) {
+        return false;
+      }
+      return Boolean(summary.isSlotInteractive && slot.unlocked);
     },
     []
   );
@@ -99,14 +117,15 @@ export function SlotMap({
   const handleMarkerClick = useCallback(
     (slotId: string) => {
       onFocusSlot(slotId);
+      onOpenSlotDetails(slotId);
     },
-    [onFocusSlot]
+    [onFocusSlot, onOpenSlotDetails]
   );
 
   const handleMarkerDrop = useCallback(
     (slotId: string, event: DragEvent<HTMLButtonElement>) => {
       const marker = markers.find((entry) => entry.slot.id === slotId);
-      if (!marker || !canDropOnSlot(marker.slot, marker.locked)) {
+      if (!marker || !canDropOnSlot(marker.slot, marker.summary)) {
         setHoveredSlotId(null);
         return;
       }
@@ -210,19 +229,24 @@ export function SlotMap({
       );
     }
 
-    return markers.map(({ slot, anchor, locked, occupied, damaged, resolving }) => {
+    return markers.map(({ slot, anchor, summary, locked, damaged, resolving }) => {
       const isSelected = slot.id === selectedSlotId;
       const isHovered = slot.id === hoveredSlotId;
-      const isDroppable = Boolean(draggedCardId && canDropOnSlot(slot, locked));
+      const isDroppable = Boolean(draggedCard && canDropOnSlot(slot, summary));
+      const showDraggedPreview = Boolean(isHovered && isDroppable && draggedCard);
+      const occupant = summary?.occupant ?? null;
+      const previewCard = showDraggedPreview ? draggedCard : occupant;
+      const placeholderLabel = slot.unlocked ? (locked ? 'Busy' : 'Open') : 'Locked';
       const markerClass = [
         'slot-map__marker',
         isSelected ? 'slot-map__marker--selected' : '',
         locked ? 'slot-map__marker--locked' : '',
-        occupied ? 'slot-map__marker--occupied' : '',
+        occupant ? 'slot-map__marker--occupied' : '',
         damaged ? 'slot-map__marker--damaged' : '',
         resolving ? 'slot-map__marker--resolving' : '',
         isHovered ? 'slot-map__marker--hovered' : '',
-        isDroppable ? 'slot-map__marker--droppable' : ''
+        isDroppable ? 'slot-map__marker--droppable' : '',
+        showDraggedPreview ? 'slot-map__marker--preview' : ''
       ]
         .filter(Boolean)
         .join(' ');
@@ -234,67 +258,109 @@ export function SlotMap({
         statusParts.push('Resolving action');
       } else if (resolving) {
         statusParts.push('Exploration underway');
-      } else if (occupied) {
-        statusParts.push('Occupied');
+      } else if (occupant) {
+        const occupantStatus = describeCardForStatus(occupant);
+        statusParts.push(occupantStatus ? `Occupied by ${occupantStatus}` : 'Occupied');
       } else {
         statusParts.push('Open');
       }
       if (damaged) {
         statusParts.push('Damaged');
       }
+      if (summary?.availabilityNote) {
+        statusParts.push(summary.availabilityNote);
+      }
+
+      const actionLabel = summary?.actionLabel ?? null;
+      const actionReady = Boolean(
+        actionLabel && summary?.canActivate && summary?.isSlotInteractive && summary?.occupant
+      );
 
       return (
-        <button
+        <div
           key={slot.id}
-          type="button"
-          data-slot-id={slot.id}
           className={markerClass}
           style={{ left: `${anchor.x}%`, top: `${anchor.y}%` }}
-          onClick={() => handleMarkerClick(slot.id)}
-          onDragOver={(event) => {
-            if (!draggedCardId || !canDropOnSlot(slot, locked)) {
-              return;
-            }
-            event.preventDefault();
-            event.dataTransfer.dropEffect = 'move';
-            setHoveredSlotId(slot.id);
-          }}
-          onDragEnter={(event) => {
-            if (!draggedCardId || !canDropOnSlot(slot, locked)) {
-              return;
-            }
-            event.preventDefault();
-            setHoveredSlotId(slot.id);
-          }}
-          onDragLeave={(event) => {
-            if (!(event.currentTarget instanceof HTMLElement)) {
-              return;
-            }
-            const related = event.relatedTarget as Node | null;
-            if (related && event.currentTarget.contains(related)) {
-              return;
-            }
-            setHoveredSlotId((current) => (current === slot.id ? null : current));
-          }}
-          onDrop={(event) => handleMarkerDrop(slot.id, event)}
-          aria-pressed={isSelected}
-          aria-label={`${slot.name} — ${statusParts.join(', ')}`}
         >
-          <span className="slot-map__marker-outline" aria-hidden="true" />
+          <button
+            type="button"
+            data-slot-id={slot.id}
+            className="slot-map__marker-button"
+            onClick={() => handleMarkerClick(slot.id)}
+            onDragOver={(event) => {
+              if (!draggedCard || !canDropOnSlot(slot, summary)) {
+                return;
+              }
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'move';
+              setHoveredSlotId(slot.id);
+            }}
+            onDragEnter={(event) => {
+              if (!draggedCard || !canDropOnSlot(slot, summary)) {
+                return;
+              }
+              event.preventDefault();
+              setHoveredSlotId(slot.id);
+            }}
+            onDragLeave={(event) => {
+              if (!(event.currentTarget instanceof HTMLElement)) {
+                return;
+              }
+              const related = event.relatedTarget as Node | null;
+              if (related && event.currentTarget.contains(related)) {
+                return;
+              }
+              setHoveredSlotId((current) => (current === slot.id ? null : current));
+            }}
+            onDrop={(event) => handleMarkerDrop(slot.id, event)}
+            aria-pressed={isSelected}
+            aria-label={`${slot.name} — ${statusParts.join(', ')}`}
+          >
+            <span className="slot-map__marker-outline" aria-hidden="true" />
+            {previewCard ? (
+              <span className="slot-map__marker-card" aria-hidden="true">
+                <span className="slot-map__marker-card-type">
+                  {previewCard.type.charAt(0).toUpperCase() + previewCard.type.slice(1)}
+                </span>
+                <span className="slot-map__marker-card-name">{previewCard.name}</span>
+              </span>
+            ) : (
+              <span className="slot-map__marker-placeholder" aria-hidden="true">
+                {placeholderLabel}
+              </span>
+            )}
+          </button>
+          {actionReady ? (
+            <button
+              type="button"
+              data-slot-id={slot.id}
+              className="slot-map__marker-action"
+              onClick={(event) => {
+                event.stopPropagation();
+                onFocusSlot(slot.id);
+                onActivateSlot(slot.id);
+              }}
+              aria-label={`${actionLabel} ${slot.name}`}
+            >
+              {actionLabel}
+            </button>
+          ) : null}
           <span className="slot-map__marker-label" aria-hidden="true">
             {slot.name}
           </span>
-        </button>
+        </div>
       );
     });
   }, [
     markers,
     selectedSlotId,
     hoveredSlotId,
-    draggedCardId,
+    draggedCard,
     canDropOnSlot,
     handleMarkerClick,
-    handleMarkerDrop
+    handleMarkerDrop,
+    onActivateSlot,
+    onFocusSlot
   ]);
 
   return (

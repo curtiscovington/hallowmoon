@@ -227,12 +227,22 @@ body {
   transform: translate(-50%, -50%);
   width: clamp(2.6rem, 7vw, 3.4rem);
   height: clamp(2.6rem, 7vw, 3.4rem);
-  background: transparent;
-  border: none;
+  pointer-events: none;
+  color: inherit;
+}
+
+.slot-map__marker-button {
+  position: relative;
+  width: 100%;
+  height: 100%;
   padding: 0;
+  border: none;
+  border-radius: 0.75rem;
+  background: transparent;
+  display: grid;
+  place-items: center;
   cursor: pointer;
   pointer-events: auto;
-  color: inherit;
 }
 
 .slot-map__marker-outline {
@@ -244,9 +254,52 @@ body {
   box-shadow: 0 6px 16px rgba(10, 6, 26, 0.55);
 }
 
+.slot-map__marker-card,
+.slot-map__marker-placeholder {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  border-radius: 0.65rem;
+  width: calc(100% - 0.25rem);
+  height: calc(100% - 0.25rem);
+  padding: 0.3rem;
+}
+
+.slot-map__marker-card {
+  background: linear-gradient(180deg, rgba(64, 54, 108, 0.9), rgba(26, 18, 54, 0.92));
+  color: rgba(232, 226, 255, 0.96);
+  gap: 0.2rem;
+  grid-template-rows: min-content 1fr;
+}
+
+.slot-map__marker-card-type {
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(186, 214, 255, 0.85);
+}
+
+.slot-map__marker-card-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slot-map__marker-placeholder {
+  font-size: 0.7rem;
+  color: rgba(214, 206, 244, 0.88);
+  background: rgba(18, 12, 38, 0.85);
+}
+
 .slot-map__marker-label {
   position: absolute;
-  top: calc(100% + 0.4rem);
+  top: calc(100% + 0.45rem);
   left: 50%;
   transform: translateX(-50%);
   padding: 0.3rem 0.6rem;
@@ -255,9 +308,11 @@ body {
   font-size: 0.75rem;
   color: rgba(233, 225, 255, 0.86);
   white-space: nowrap;
+  pointer-events: auto;
 }
 
-.slot-map__marker:focus-visible .slot-map__marker-outline {
+.slot-map__marker-button:focus-visible .slot-map__marker-outline,
+.slot-map__marker-action:focus-visible {
   outline: 2px solid rgba(214, 204, 255, 0.85);
   outline-offset: 2px;
 }
@@ -289,6 +344,30 @@ body {
 .slot-map__marker--hovered .slot-map__marker-outline {
   border-color: rgba(255, 255, 255, 0.92);
   box-shadow: 0 0 0 3px rgba(185, 167, 255, 0.5);
+}
+
+.slot-map__marker--preview .slot-map__marker-outline {
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 4px rgba(200, 188, 255, 0.55);
+}
+
+.slot-map__marker-action {
+  position: absolute;
+  top: -0.6rem;
+  right: -0.6rem;
+  pointer-events: auto;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.68rem;
+  border-radius: 999px;
+  border: none;
+  background: rgba(82, 56, 156, 0.92);
+  color: rgba(236, 233, 255, 0.96);
+  box-shadow: 0 6px 16px rgba(12, 6, 28, 0.55);
+  cursor: pointer;
+}
+
+.slot-map__marker-action:hover {
+  background: rgba(105, 78, 192, 0.95);
 }
 
 .slot-map__empty {
@@ -354,6 +433,12 @@ body {
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
   box-shadow: 0 18px 36px rgba(8, 4, 22, 0.55);
   backdrop-filter: blur(18px);
+}
+
+.slot-card--modal {
+  width: min(540px, 92vw);
+  max-height: min(90vh, 640px);
+  overflow-y: auto;
 }
 
 .slot-card[data-slot-type='work'] {
@@ -1923,4 +2008,65 @@ button {
 .card-reveal__button:focus-visible {
   outline: 2px solid rgba(255, 240, 186, 0.85);
   outline-offset: 2px;
+}
+
+.slot-details-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: clamp(1rem, 3vw, 2.5rem);
+}
+
+.slot-details-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 4, 18, 0.78);
+  backdrop-filter: blur(16px);
+}
+
+.slot-details-overlay__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(600px, 94vw);
+  max-height: min(92vh, 720px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.slot-details-overlay__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 200, 255, 0.35);
+  background: rgba(24, 16, 40, 0.92);
+  color: rgba(235, 230, 255, 0.9);
+  font-size: 1.15rem;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(12, 6, 28, 0.45);
+}
+
+.slot-details-overlay__close:hover {
+  background: rgba(42, 30, 72, 0.95);
+}
+
+.slot-details-overlay__close:focus-visible {
+  outline: 2px solid rgba(214, 200, 255, 0.8);
+  outline-offset: 3px;
+}
+
+.slot-details-overlay__content {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  pointer-events: auto;
 }
