@@ -98,20 +98,6 @@ function formatSpeedDisplay(value: number): string {
   return Number.isInteger(value) ? `${value}` : value.toFixed(1);
 }
 
-function ResourceTrack({ label, value, icon }: { label: string; value: number; icon: string }) {
-  return (
-    <div className="resource-track">
-      <span className="resource-track__icon" aria-hidden="true">
-        {icon}
-      </span>
-      <div className="resource-track__meta">
-        <span className="resource-track__label">{label}</span>
-        <span className="resource-track__value">{value}</span>
-      </div>
-    </div>
-  );
-}
-
 function CardView({
   card,
   selected = false,
@@ -879,9 +865,21 @@ export default function App() {
     [state.cards, state.hand]
   );
 
-  const slots = useMemo(() => Object.values(state.slots).sort((a, b) => a.name.localeCompare(b.name)), [
-    state.slots
-  ]);
+  const slots = useMemo(() => Object.values(state.slots), [state.slots]);
+  const locationSlots = useMemo(
+    () =>
+      slots
+        .filter((slot) => slot.type === 'location')
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [slots]
+  );
+  const nonLocationSlots = useMemo(
+    () =>
+      slots
+        .filter((slot) => slot.type !== 'location')
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [slots]
+  );
 
   const locationExplorationAvailability = useMemo(() => {
     const availability: Partial<Record<LocationTag, boolean>> = {};
@@ -979,12 +977,6 @@ export default function App() {
     setIsHandOpen(isDesktop);
   }, [isDesktop]);
 
-  const resourceTracks = [
-    { label: 'Coin', value: state.resources.coin, icon: '🪙' },
-    { label: 'Lore', value: state.resources.lore, icon: '📜' },
-    { label: 'Glimmer', value: state.resources.glimmer, icon: '✨' }
-  ];
-
   const chronicleTitleId = 'chronicle-title';
 
   const chronicleContent = (
@@ -1014,27 +1006,50 @@ export default function App() {
     </>
   );
 
+  function renderSlotCard(slot: Slot) {
+    const occupant = slot.occupantId ? state.cards[slot.occupantId] ?? null : null;
+    const assistant = slot.assistantId ? state.cards[slot.assistantId] ?? null : null;
+    const attachments = slot.attachedCardIds
+      .map((cardId) => state.cards[cardId])
+      .filter((card): card is CardInstance => Boolean(card));
+    const isHeroInSlot = Boolean(
+      (occupant && occupant.id === state.heroCardId) || (assistant && assistant.id === state.heroCardId)
+    );
+    const canExplore =
+      slot.type === 'location' && slot.state !== 'damaged'
+        ? slot.location
+          ? locationExplorationAvailability[slot.location] ?? true
+          : true
+        : true;
+
+    return (
+      <SlotView
+        key={slot.id}
+        slot={slot}
+        occupant={occupant}
+        assistant={assistant}
+        attachments={attachments}
+        isHeroInSlot={isHeroInSlot}
+        hasSelectedCard={Boolean(selectedCard)}
+        selectedCardName={selectedCard?.name ?? null}
+        onClick={handleSlotClick}
+        onActivate={activateSlot}
+        onUpgrade={upgradeSlot}
+        upgradeCost={getUpgradeCost(slot.id)}
+        onRecall={recallCard}
+        onDropCard={handleSlotDrop}
+        onCardDragStart={handleCardDragStart}
+        onCardDragEnd={handleCardDragEnd}
+        timing={timingContext}
+        resources={state.resources}
+        isTimePaused={isPaused}
+        canExploreLocation={canExplore}
+      />
+    );
+  }
+
   return (
     <div className="game-shell">
-      <header className="game-header">
-        <div className="game-header__identity">
-          <span className="game-header__badge">Veiled Ledger</span>
-          <h1 className="game-header__title">Chamber of Echoes</h1>
-          <p className="game-header__subtitle">
-            Combine cards, nurture cultic slots, and push into the Hollow Ways.
-          </p>
-        </div>
-        <div className="game-header__status">
-          <div className="game-header__resources" aria-label="Resource overview">
-            <div className="game-header__resources-scroll">
-              {resourceTracks.map((track) => (
-                <ResourceTrack key={track.label} {...track} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </header>
-
       <nav className="game-controls" aria-label="Time controls">
         <button
           className="game-controls__button game-controls__button--pause"
@@ -1086,49 +1101,15 @@ export default function App() {
       </nav>
 
       <main className="game-main">
+        {locationSlots.length > 0 ? (
+          <section className="game-locations" aria-label="Known locations">
+            <div className="slots-grid slots-grid--locations">
+              {locationSlots.map((slot) => renderSlotCard(slot))}
+            </div>
+          </section>
+        ) : null}
         <section className="slots-grid" aria-label="Available slots">
-          {slots.map((slot) => {
-            const occupant = slot.occupantId ? state.cards[slot.occupantId] ?? null : null;
-            const assistant = slot.assistantId ? state.cards[slot.assistantId] ?? null : null;
-            const attachments = slot.attachedCardIds
-              .map((cardId) => state.cards[cardId])
-              .filter((card): card is CardInstance => Boolean(card));
-            const isHeroInSlot = Boolean(
-              (occupant && occupant.id === state.heroCardId) ||
-                (assistant && assistant.id === state.heroCardId)
-            );
-            const canExplore =
-              slot.type === 'location' && slot.state !== 'damaged'
-                ? slot.location
-                  ? locationExplorationAvailability[slot.location] ?? true
-                  : true
-                : true;
-
-            return (
-              <SlotView
-                key={slot.id}
-                slot={slot}
-                occupant={occupant}
-                assistant={assistant}
-                attachments={attachments}
-                isHeroInSlot={isHeroInSlot}
-                hasSelectedCard={Boolean(selectedCard)}
-                selectedCardName={selectedCard?.name ?? null}
-                onClick={handleSlotClick}
-                onActivate={activateSlot}
-                onUpgrade={upgradeSlot}
-                upgradeCost={getUpgradeCost(slot.id)}
-                onRecall={recallCard}
-                onDropCard={handleSlotDrop}
-                onCardDragStart={handleCardDragStart}
-                onCardDragEnd={handleCardDragEnd}
-                timing={timingContext}
-                resources={state.resources}
-                isTimePaused={isPaused}
-                canExploreLocation={canExplore}
-              />
-            );
-          })}
+          {nonLocationSlots.map((slot) => renderSlotCard(slot))}
         </section>
         {isDesktop ? (
           <aside className="game-log" aria-live="polite">
