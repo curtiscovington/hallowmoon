@@ -45,14 +45,15 @@ function manorMessages(): LocationMessages {
       `${personaName} ventures deeper into ${slotName}, mapping its passages. They will report back soon.`,
     alreadyExploring: (personaName) => `${personaName} is already charting the manor’s halls.`,
     nothingToFind: () => 'The manor is quiet for now; every discovered room awaits restoration.',
-    reveal: ({ personaName, revealed, removeSlot }) => {
+    reveal: ({ personaName, revealed, remainingDiscoveries }) => {
       const fragment = revealed.join(', ');
-      return removeSlot
-        ? `${personaName} charts the manor’s halls, revealing ${fragment} before the manor’s entrance seals behind them.`
-        : `${personaName} charts the manor’s halls, revealing ${fragment}. More ruined chambers await discovery.`;
+      if (remainingDiscoveries > 0) {
+        return `${personaName} charts the manor’s halls, revealing ${fragment}. More ruined chambers await discovery.`;
+      }
+      return `${personaName} charts the manor’s halls, revealing ${fragment}. The manor’s approach remains open for redeployment.`;
     },
     nothingFound: (personaName) =>
-      `${personaName} finds no further chambers awaiting discovery as the manor’s entrance seals behind them.`
+      `${personaName} finds no further chambers awaiting discovery, though the manor’s entrance remains ready for the next expedition.`
   };
 }
 
@@ -92,7 +93,7 @@ export const LOCATION_DEFINITIONS: Record<LocationTag, LocationDefinition> = {
       'damaged-circle',
       'damaged-bedroom'
     ],
-    removeWhenComplete: true,
+    removeWhenComplete: false,
     allowExplorationWhenExhausted: false,
     messages: manorMessages()
   },

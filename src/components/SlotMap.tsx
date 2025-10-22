@@ -9,6 +9,7 @@ import {
 } from 'react';
 import {
   MAP_DEFINITIONS,
+  MAP_SEQUENCE,
   MapId,
   MapSlotAnchor,
   findAnchorForSlot
@@ -300,6 +301,23 @@ export function SlotMap({
         actionLabel && summary?.canActivate && summary?.isSlotInteractive && summary?.occupant
       );
 
+      const travelTargetMapId =
+        mapId === 'overworld' && slot.location
+          ?
+              MAP_SEQUENCE.find((candidate) => {
+                if (candidate === 'overworld') {
+                  return false;
+                }
+                const definition = MAP_DEFINITIONS[candidate];
+                return definition.focusLocations.includes(slot.location);
+              }) ?? null
+          : null;
+      const travelDefinition = travelTargetMapId ? MAP_DEFINITIONS[travelTargetMapId] : null;
+      const canTravelToTarget = Boolean(
+        travelTargetMapId && travelDefinition && availableMaps.includes(travelTargetMapId) && !occupant
+      );
+      const travelLabel = travelDefinition ? `Visit ${travelDefinition.name}` : null;
+
       return (
         <div
           key={slot.id}
@@ -351,7 +369,22 @@ export function SlotMap({
               <span className="slot-map__marker-emblem-icon">{markerGlyph}</span>
             </span>
           </button>
-          {actionReady ? (
+          {canTravelToTarget && travelTargetMapId && travelLabel ? (
+            <button
+              type="button"
+              data-slot-id={slot.id}
+              className="slot-map__marker-action"
+              onClick={(event) => {
+                event.stopPropagation();
+                onFocusSlot(slot.id);
+                onMapChange(travelTargetMapId);
+              }}
+              aria-label={`${travelLabel} ${slot.name}`}
+            >
+              {travelLabel}
+            </button>
+          ) : null}
+          {!canTravelToTarget && actionReady ? (
             <button
               type="button"
               data-slot-id={slot.id}
@@ -373,15 +406,18 @@ export function SlotMap({
       );
     });
   }, [
-    markers,
-    selectedSlotId,
-    hoveredSlotId,
-    draggedCard,
+    availableMaps,
     canDropOnSlot,
+    draggedCard,
     handleMarkerClick,
     handleMarkerDrop,
+    hoveredSlotId,
+    mapId,
+    markers,
     onActivateSlot,
-    onFocusSlot
+    onFocusSlot,
+    onMapChange,
+    selectedSlotId
   ]);
 
   return (
