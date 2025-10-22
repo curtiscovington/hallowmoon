@@ -20,7 +20,7 @@ import {
   type SlotCardPlacementContext
 } from './slots/behaviors';
 import { createEmptyJournal } from './slots/study';
-import { MANOR_ROOM_TEMPLATE_KEYS } from './slots/manor';
+import { LOCATION_DEFINITIONS, getMissingLocationTemplateKeys } from './slots/location';
 
 type RandomSource = () => number;
 type Clock = () => number;
@@ -51,6 +51,7 @@ function instantiateSlot(template: SlotTemplate, id?: string): Slot {
     name: template.name,
     type: template.type,
     description: template.description,
+    location: template.location ?? null,
     level: 1,
     upgradeCost: template.upgradeCost,
     traits: [...template.traits],
@@ -80,8 +81,12 @@ function initialState(): GameState {
   const whisper = instantiateCard(OPPORTUNITY_TEMPLATES[0]);
   const slots: Record<string, Slot> = {};
   const manorSlot = instantiateSlot(SLOT_TEMPLATES.manor);
+  const townSlot = instantiateSlot(SLOT_TEMPLATES.town);
+  const forestSlot = instantiateSlot(SLOT_TEMPLATES.forest);
 
   slots[manorSlot.id] = manorSlot;
+  slots[townSlot.id] = townSlot;
+  slots[forestSlot.id] = forestSlot;
 
   return {
     cycle: 1,
@@ -228,7 +233,7 @@ function getSlotBaseLockDurationMs(slot: Slot, state?: GameState): number {
   }
 
   const base = SLOT_LOCK_DURATIONS[slot.type] ?? SLOT_LOCK_BASE_MS;
-  if (slot.type === 'manor' && slot.state === 'damaged') {
+  if (slot.type === 'location' && slot.state === 'damaged') {
     return base * 2;
   }
   return base;
@@ -258,7 +263,7 @@ function isCardAllowedInSlot(state: GameState, card: CardInstance, slot: Slot): 
   return true;
 }
 
-function completeManorExploration(state: GameState, slotId: string, log: string[]): {
+function completeLocationExploration(state: GameState, slotId: string, log: string[]): {
   state: GameState;
   log: string[];
 } {
@@ -268,28 +273,26 @@ function completeManorExploration(state: GameState, slotId: string, log: string[
   }
 
   const persona = currentSlot.occupantId ? state.cards[currentSlot.occupantId] ?? null : null;
-  const missingKeys = MANOR_ROOM_TEMPLATE_KEYS.filter((templateKey) => {
-    const template = SLOT_TEMPLATES[templateKey];
-    const restoredKey = template.repair ? SLOT_TEMPLATES[template.repair.targetKey].key : null;
-    return !Object.values(state.slots).some(
-      (existing) => existing.key === template.key || (restoredKey ? existing.key === restoredKey : false)
-    );
-  });
+  const definition = currentSlot.location ? LOCATION_DEFINITIONS[currentSlot.location] ?? null : null;
+  const missingKeys = definition ? getMissingLocationTemplateKeys(state, definition.key) : [];
 
   const updatedSlots: Record<string, Slot> = { ...state.slots };
-  const revealedRooms: string[] = [];
+  const revealedSites: string[] = [];
 
   if (missingKeys.length > 0) {
     const selectedKey = missingKeys[0];
     const template = SLOT_TEMPLATES[selectedKey];
-    const newRoom = instantiateSlot(template);
-    updatedSlots[newRoom.id] = newRoom;
-    revealedRooms.push(newRoom.name);
+    if (template) {
+      const newSite = instantiateSlot(template);
+      updatedSlots[newSite.id] = newSite;
+      revealedSites.push(newSite.name);
+    }
   }
 
-  const shouldRemoveManor = missingKeys.length <= 1;
+  const remainingAfterReveal = missingKeys.length > 0 ? missingKeys.length - 1 : 0;
+  const shouldRemoveSlot = Boolean(definition?.removeWhenComplete && missingKeys.length <= 1);
 
-  if (shouldRemoveManor) {
+  if (shouldRemoveSlot) {
     delete updatedSlots[slotId];
   } else {
     updatedSlots[slotId] = {
@@ -312,18 +315,26 @@ function completeManorExploration(state: GameState, slotId: string, log: string[
 
   let nextLog = log;
   const explorerName = persona ? persona.name : 'Your retinue';
-
-  if (revealedRooms.length > 0) {
-    const roomsFragment = revealedRooms.join(', ');
-    const summary = shouldRemoveManor
-      ? `${explorerName} charts the manor’s halls, revealing ${roomsFragment} before the manor’s entrance seals behind them.`
-      : `${explorerName} charts the manor’s halls, revealing ${roomsFragment}. More ruined chambers await discovery.`;
-    nextLog = appendLog(log, summary);
+  if (definition) {
+    if (revealedSites.length > 0) {
+      nextLog = appendLog(
+        log,
+        definition.messages.reveal({
+          personaName: explorerName,
+          slotName: currentSlot.name,
+          revealed: revealedSites,
+          remainingDiscoveries: remainingAfterReveal,
+          removeSlot: shouldRemoveSlot
+        })
+      );
+    } else {
+      nextLog = appendLog(log, definition.messages.nothingFound(explorerName, currentSlot.name));
+    }
+  } else if (revealedSites.length > 0) {
+    const fragment = revealedSites.join(', ');
+    nextLog = appendLog(log, `${explorerName} uncovers ${fragment} within ${currentSlot.name}.`);
   } else {
-    nextLog = appendLog(
-      log,
-      `${explorerName} finds no further chambers awaiting discovery as the manor’s entrance seals behind them.`
-    );
+    nextLog = appendLog(log, `${explorerName} reports no new findings in ${currentSlot.name}.`);
   }
 
   return {
@@ -357,8 +368,8 @@ function resolvePendingSlotActions(state: GameState, now: number): GameState {
     }
 
     switch (slot.pendingAction.type) {
-      case 'explore-manor': {
-        const result = completeManorExploration(nextState, slotId, nextState.log);
+      case 'explore-location': {
+        const result = completeLocationExploration(nextState, slotId, nextState.log);
         nextState = result.state;
         break;
       }

@@ -54,7 +54,9 @@ export interface CardInstance {
   location: CardLocation;
 }
 
-export type SlotType = 'hearth' | 'work' | 'study' | 'ritual' | 'expedition' | 'manor' | 'bedroom';
+export type LocationTag = 'manor' | 'town' | 'forest';
+
+export type SlotType = 'hearth' | 'work' | 'study' | 'ritual' | 'expedition' | 'location' | 'bedroom';
 
 export type SlotState = 'active' | 'damaged';
 
@@ -67,7 +69,7 @@ export interface SlotRepair {
 export type SlotAcceptance = 'persona-only' | 'non-persona' | 'any';
 
 export type PendingSlotAction =
-  | { type: 'explore-manor' }
+  | { type: 'explore-location'; location: LocationTag | null }
   | { type: 'deliver-cards'; cardIds: string[]; reveal: boolean };
 
 export interface Slot {
@@ -76,6 +78,7 @@ export interface Slot {
   name: string;
   type: SlotType;
   description: string;
+  location: LocationTag | null;
   level: number;
   upgradeCost: number;
   traits: string[];
