@@ -16,6 +16,23 @@ import {
 import type { CardInstance, Slot } from '../state/types';
 import { describeCardForStatus } from '../utils/slotActions';
 
+type MarkerPlaceholderState = 'locked' | 'busy' | 'open';
+
+const CARD_TYPE_GLYPHS: Record<CardInstance['type'], string> = {
+  persona: '👤',
+  inspiration: '✨',
+  relic: '🔶',
+  task: '📜'
+};
+
+const PLACEHOLDER_GLYPHS: Record<MarkerPlaceholderState, string> = {
+  locked: '🔒',
+  busy: '⏳',
+  open: '＋'
+};
+
+const DEFAULT_GLYPH = '✦';
+
 export interface SlotMapSlotSummary {
   occupant: CardInstance | null;
   assistant: CardInstance | null;
@@ -236,7 +253,14 @@ export function SlotMap({
       const showDraggedPreview = Boolean(isHovered && isDroppable && draggedCard);
       const occupant = summary?.occupant ?? null;
       const previewCard = showDraggedPreview ? draggedCard : occupant;
-      const placeholderLabel = slot.unlocked ? (locked ? 'Busy' : 'Open') : 'Locked';
+      const placeholderState: MarkerPlaceholderState = !slot.unlocked
+        ? 'locked'
+        : locked
+        ? 'busy'
+        : 'open';
+      const markerGlyph = previewCard
+        ? CARD_TYPE_GLYPHS[previewCard.type] ?? DEFAULT_GLYPH
+        : PLACEHOLDER_GLYPHS[placeholderState] ?? DEFAULT_GLYPH;
       const markerClass = [
         'slot-map__marker',
         isSelected ? 'slot-map__marker--selected' : '',
@@ -317,18 +341,15 @@ export function SlotMap({
             aria-label={`${slot.name} — ${statusParts.join(', ')}`}
           >
             <span className="slot-map__marker-outline" aria-hidden="true" />
-            {previewCard ? (
-              <span className="slot-map__marker-card" aria-hidden="true">
-                <span className="slot-map__marker-card-type">
-                  {previewCard.type.charAt(0).toUpperCase() + previewCard.type.slice(1)}
-                </span>
-                <span className="slot-map__marker-card-name">{previewCard.name}</span>
-              </span>
-            ) : (
-              <span className="slot-map__marker-placeholder" aria-hidden="true">
-                {placeholderLabel}
-              </span>
-            )}
+            <span
+              className="slot-map__marker-emblem"
+              data-card-type={previewCard ? previewCard.type : undefined}
+              data-marker-state={previewCard ? undefined : placeholderState}
+              data-preview={showDraggedPreview ? 'true' : undefined}
+              aria-hidden="true"
+            >
+              <span className="slot-map__marker-emblem-icon">{markerGlyph}</span>
+            </span>
           </button>
           {actionReady ? (
             <button

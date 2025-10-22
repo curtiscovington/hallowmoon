@@ -55,17 +55,14 @@ body {
 }
 
 .game-map-panel {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: clamp(1rem, 2vw, 1.5rem);
 }
 
 @media (min-width: 900px) {
   .game-main {
     grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
-    align-items: start;
-  }
-  .game-map-panel {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
     align-items: start;
   }
 }
@@ -254,47 +251,66 @@ body {
   box-shadow: 0 6px 16px rgba(10, 6, 26, 0.55);
 }
 
-.slot-map__marker-card,
-.slot-map__marker-placeholder {
+.slot-map__marker-emblem {
   position: relative;
   z-index: 1;
   display: grid;
   place-items: center;
-  text-align: center;
-  border-radius: 0.65rem;
-  width: calc(100% - 0.25rem);
-  height: calc(100% - 0.25rem);
-  padding: 0.3rem;
+  width: calc(100% - 0.3rem);
+  height: calc(100% - 0.3rem);
+  border-radius: 0.85rem;
+  background: rgba(21, 14, 42, 0.88);
+  box-shadow: inset 0 0 0 1px rgba(174, 160, 232, 0.45);
+  color: rgba(232, 226, 255, 0.95);
+  transition: background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
-.slot-map__marker-card {
-  background: linear-gradient(180deg, rgba(64, 54, 108, 0.9), rgba(26, 18, 54, 0.92));
-  color: rgba(232, 226, 255, 0.96);
-  gap: 0.2rem;
-  grid-template-rows: min-content 1fr;
+.slot-map__marker-emblem[data-card-type] {
+  box-shadow: inset 0 0 0 1px rgba(210, 198, 255, 0.68), 0 12px 20px rgba(16, 10, 32, 0.55);
 }
 
-.slot-map__marker-card-type {
-  font-size: 0.62rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(186, 214, 255, 0.85);
+.slot-map__marker-emblem[data-card-type='persona'] {
+  background: radial-gradient(circle at 30% 30%, rgba(192, 178, 255, 0.9), rgba(102, 72, 200, 0.92));
 }
 
-.slot-map__marker-card-name {
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1.1;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.slot-map__marker-emblem[data-card-type='inspiration'] {
+  background: radial-gradient(circle at 30% 30%, rgba(255, 221, 173, 0.88), rgba(210, 132, 96, 0.92));
 }
 
-.slot-map__marker-placeholder {
-  font-size: 0.7rem;
-  color: rgba(214, 206, 244, 0.88);
-  background: rgba(18, 12, 38, 0.85);
+.slot-map__marker-emblem[data-card-type='relic'] {
+  background: radial-gradient(circle at 30% 30%, rgba(155, 234, 255, 0.9), rgba(68, 164, 210, 0.92));
+}
+
+.slot-map__marker-emblem[data-card-type='task'] {
+  background: radial-gradient(circle at 30% 30%, rgba(206, 189, 255, 0.88), rgba(120, 92, 196, 0.9));
+}
+
+.slot-map__marker-emblem[data-marker-state='open'] {
+  background: rgba(21, 14, 42, 0.88);
+  color: rgba(220, 212, 255, 0.92);
+}
+
+.slot-map__marker-emblem[data-marker-state='busy'] {
+  background: rgba(46, 26, 76, 0.92);
+  color: rgba(236, 225, 255, 0.95);
+  box-shadow: inset 0 0 0 1px rgba(205, 189, 255, 0.55);
+}
+
+.slot-map__marker-emblem[data-marker-state='locked'] {
+  background: rgba(30, 22, 60, 0.88);
+  color: rgba(180, 168, 220, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(112, 100, 178, 0.6);
+}
+
+.slot-map__marker-emblem[data-preview='true'] {
+  transform: scale(0.94);
+  box-shadow: inset 0 0 0 2px rgba(240, 232, 255, 0.85), 0 0 16px rgba(208, 196, 255, 0.6);
+}
+
+.slot-map__marker-emblem-icon {
+  font-size: clamp(1.2rem, 3vw, 1.6rem);
+  line-height: 1;
+  filter: drop-shadow(0 4px 10px rgba(8, 4, 18, 0.45));
 }
 
 .slot-map__marker-label {
@@ -386,40 +402,6 @@ body {
   }
 }
 
-.game-slot-panel {
-  display: grid;
-  align-content: start;
-  gap: clamp(0.75rem, 2vw, 1rem);
-  min-height: clamp(240px, 48vh, 360px);
-}
-
-.game-slot-panel > .slot-card {
-  height: 100%;
-}
-
-.game-slot-panel__placeholder {
-  margin: 0;
-  display: grid;
-  place-content: center;
-  gap: 0.5rem;
-  text-align: center;
-  color: rgba(224, 216, 255, 0.8);
-  padding: clamp(1rem, 2vw, 1.4rem);
-  border-radius: 1.15rem;
-  background: linear-gradient(185deg, rgba(34, 26, 54, 0.8), rgba(18, 14, 36, 0.92));
-  border: 1px solid rgba(142, 120, 255, 0.28);
-  box-shadow: 0 18px 32px rgba(8, 4, 22, 0.45);
-}
-
-.game-slot-panel__placeholder h3 {
-  margin: 0;
-  font-size: 1.1rem;
-}
-
-.game-slot-panel__placeholder p {
-  margin: 0;
-  font-size: 0.9rem;
-}
 
 .slot-card {
   background: linear-gradient(185deg, rgba(34, 26, 54, 0.82), rgba(18, 14, 36, 0.95));
