@@ -2,7 +2,7 @@
 
 ## Current Loop Snapshot
 - **Character creation** currently offers only two species choices, Werewolf or Vampire, so the opening decision space is narrow.【F:src/components/CharacterCreation.tsx†L5-L55】
-- **Base restoration** now starts at the shuttered manor: exploring The Manor reveals ruined rooms (sanctum, scriptorium, archive, circle, bedroom) that demand persona-driven repairs across multiple time pulses before their familiar stations unlock.【F:src/state/GameContext.tsx†L100-L208】【F:docs/manor-restoration.md†L4-L38】
+- **Base restoration** now begins with a trio of `location` slots: exploring The Manor uncovers ruined rooms that require persona-driven repairs, Moonlit Town grants access to the Lunar Church and Moonlit Shop, and the Whispering Forest currently offers flavourful but empty scouting runs.【F:src/state/GameContext.tsx†L100-L208】【F:docs/manor-restoration.md†L4-L38】
 - **World exploration** is limited to three static map nodes (village, forest, ruins) with a couple of fixed actions, which constrains variety between sessions.【F:src/components/WorldMap.tsx†L6-L50】
 - **Hero kits** consist of a small, predefined move list per species, so abilities never evolve beyond the initial four actions you start with.【F:src/state/combat.ts†L12-L66】
 - **Economy** now includes the Moonlit Market in Silverfen Village, letting players trade coins for restorative brews and permanent stat boons, but inventory is limited to a tiny rotating stock so long-term goals remain sparse.【F:src/components/WorldMap.tsx†L7-L27】【F:src/components/MoonlitMarket.tsx†L1-L79】【F:src/state/GameContext.tsx†L40-L135】

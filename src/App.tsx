@@ -10,26 +10,19 @@ import {
   useState
 } from 'react';
 import { useGame } from './state/GameContext';
-import { CardInstance, Resources, Slot } from './state/types';
+import { CardInstance, LocationTag, Resources, Slot } from './state/types';
 import { SLOT_TYPE_INFO } from './constants/slotTypeInfo';
 import { SlotRevealOverlay } from './components/SlotRevealOverlay';
 import { CardRevealOverlay } from './components/CardRevealOverlay';
 import { formatDuration } from './utils/time';
 import { SLOT_TEMPLATES } from './state/content';
+import { LOCATION_DEFINITIONS } from './state/slots/location';
 
 const CARD_DRAG_TYPE = 'application/x-hallowmoon-card';
 
 const BASE_CYCLE_MS = 60000;
 const TIMER_RESOLUTION_MS = 200;
 const SPEED_OPTIONS = [1, 2, 3] as const;
-
-const MANOR_ROOM_TEMPLATE_KEYS = [
-  'damaged-sanctum',
-  'damaged-scriptorium',
-  'damaged-archive',
-  'damaged-circle',
-  'damaged-bedroom'
-] as const;
 
 type SpeedOption = (typeof SPEED_OPTIONS)[number];
 
@@ -230,7 +223,7 @@ function SlotView({
   timing,
   resources,
   isTimePaused,
-  canExploreManor
+  canExploreLocation
 }: {
   slot: Slot;
   occupant: CardInstance | null;
@@ -250,7 +243,7 @@ function SlotView({
   timing: CardTimingContext;
   resources: Resources;
   isTimePaused: boolean;
-  canExploreManor: boolean;
+  canExploreLocation: boolean;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 900px)');
@@ -328,8 +321,8 @@ function SlotView({
         : 'In disrepair — activate with a persona to begin restoration.'
       : null;
   const explorationNote =
-    slot.pendingAction?.type === 'explore-manor'
-      ? 'Exploration underway within the manor.'
+    slot.pendingAction?.type === 'explore-location'
+      ? `Exploration underway within ${slot.name}.`
       : null;
 
   function getActivateLabel(): string {
@@ -356,7 +349,7 @@ function SlotView({
         return 'Work';
       case 'hearth':
         return 'Rest';
-      case 'manor':
+      case 'location':
         return slot.state === 'damaged' ? 'Clear' : 'Explore';
       case 'bedroom':
         return 'Slumber';
@@ -382,14 +375,14 @@ function SlotView({
           note: canActivate ? null : 'Only a persona may make use of this slot.'
         };
       }
-      case 'manor': {
+      case 'location': {
         if (occupant.type !== 'persona') {
-          return { canActivate: false, note: 'Only a persona can tend to this chamber.' };
+          return { canActivate: false, note: 'Only a persona can tend to this site.' };
         }
-        if (slot.state !== 'damaged' && !canExploreManor) {
+        if (slot.state !== 'damaged' && !canExploreLocation) {
           return {
             canActivate: false,
-            note: 'All discoverable rooms have been revealed for now.'
+            note: 'All discoverable opportunities have been secured here for now.'
           };
         }
         return { canActivate: true, note: null };
@@ -890,25 +883,32 @@ export default function App() {
     state.slots
   ]);
 
-  const canExploreManor = useMemo(() => {
+  const locationExplorationAvailability = useMemo(() => {
+    const availability: Partial<Record<LocationTag, boolean>> = {};
     const existingKeys = new Set(Object.values(state.slots).map((slotEntry) => slotEntry.key));
 
-    return MANOR_ROOM_TEMPLATE_KEYS.some((templateKey) => {
-      const template = SLOT_TEMPLATES[templateKey];
-      if (!template) {
-        return false;
-      }
-      const restoredTemplate = template.repair ? SLOT_TEMPLATES[template.repair.targetKey] : null;
-      const restoredKey = restoredTemplate?.key ?? null;
+    Object.values(LOCATION_DEFINITIONS).forEach((definition) => {
+      const hasUndiscoveredSite = definition.discoverableTemplateKeys.some((templateKey) => {
+        const template = SLOT_TEMPLATES[templateKey];
+        if (!template) {
+          return false;
+        }
+        const restoredTemplate = template.repair ? SLOT_TEMPLATES[template.repair.targetKey] : null;
+        const restoredKey = restoredTemplate?.key ?? null;
 
-      if (existingKeys.has(template.key)) {
-        return false;
-      }
-      if (restoredKey && existingKeys.has(restoredKey)) {
-        return false;
-      }
-      return true;
+        if (existingKeys.has(template.key)) {
+          return false;
+        }
+        if (restoredKey && existingKeys.has(restoredKey)) {
+          return false;
+        }
+        return true;
+      });
+
+      availability[definition.key] = definition.allowExplorationWhenExhausted || hasUndiscoveredSite;
     });
+
+    return availability;
   }, [state.slots]);
 
   const timingContext = useMemo<CardTimingContext>(
@@ -1097,6 +1097,13 @@ export default function App() {
               (occupant && occupant.id === state.heroCardId) ||
                 (assistant && assistant.id === state.heroCardId)
             );
+            const canExplore =
+              slot.type === 'location' && slot.state !== 'damaged'
+                ? slot.location
+                  ? locationExplorationAvailability[slot.location] ?? true
+                  : true
+                : true;
+
             return (
               <SlotView
                 key={slot.id}
@@ -1118,7 +1125,7 @@ export default function App() {
                 timing={timingContext}
                 resources={state.resources}
                 isTimePaused={isPaused}
-                canExploreManor={slot.key === SLOT_TEMPLATES.manor.key ? canExploreManor : true}
+                canExploreLocation={canExplore}
               />
             );
           })}

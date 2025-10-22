@@ -5,7 +5,7 @@ import type { SlotTemplate } from '../content/slots';
 import { bedroomBehavior } from './bedroom';
 import { expeditionBehavior } from './expedition';
 import { hearthBehavior } from './hearth';
-import { manorBehavior } from './manor';
+import { locationBehavior } from './location';
 import { ritualBehavior } from './ritual';
 import { studyBehavior } from './study';
 import { workBehavior } from './work';
@@ -83,7 +83,7 @@ export const SLOT_BEHAVIORS: SlotBehaviorRegistry = {
   study: studyBehavior,
   ritual: ritualBehavior,
   expedition: expeditionBehavior,
-  manor: manorBehavior,
+  location: locationBehavior,
   bedroom: bedroomBehavior
 };
 

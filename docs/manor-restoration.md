@@ -1,8 +1,10 @@
-# Manor Restoration & Dream Scribing
+# Location Network & Manor Restoration
 
 ## Overview
-- The starting board now offers a single slot, **The Manor**, which only accepts persona cards and is used to explore the estate.
-- Exploring the manor reveals five damaged sub-rooms. Each is represented by a `manor`-type slot in disrepair and must be restored before its specialist function is available.
+- The starting board now offers three `location` slots: **The Manor**, **Moonlit Town**, and the **Whispering Forest**. Each accepts persona cards for scouting actions, keeping exploration sites grouped by their location tag.
+- Exploring the manor reveals five damaged sub-rooms. Each is represented by a `location`-type slot in disrepair and must be restored before its specialist function is available.
+- Scouting **Moonlit Town** uncovers two permanent facilities — the **Lunar Church** and the **Moonlit Shop** — expanding downtime options beyond the manor grounds.
+- Venturing into the **Whispering Forest** currently yields no discoveries, but personas can still scout it to flavour the chronicle with their empty-handed returns.
 - Damaged rooms begin repairs only after a persona activates the slot; progress now advances with each hidden time pulse (≈1 minute) while that persona remains committed.
 - Slot actions impose visible downtime: after activation, each room remains busy for its listed recovery period before it can be triggered again.
 

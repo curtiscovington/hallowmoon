@@ -6,6 +6,6 @@ export const SLOT_TYPE_INFO: Record<SlotType, { label: string; icon: string }> =
   study: { label: 'Study', icon: '📚' },
   ritual: { label: 'Ritual', icon: '🔮' },
   expedition: { label: 'Expedition', icon: '🧭' },
-  manor: { label: 'Manor', icon: '🏚️' },
+  location: { label: 'Location', icon: '📍' },
   bedroom: { label: 'Bedroom', icon: '🛏️' }
 };
