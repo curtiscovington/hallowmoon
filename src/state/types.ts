@@ -112,5 +112,8 @@ export interface GameState {
   log: string[];
   discoveries: Discovery[];
   timeScale: number;
+  pausedAt: number | null;
   pendingReveals: string[];
 }
+
+export type PersistedState = GameState;

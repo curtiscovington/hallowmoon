@@ -97,6 +97,7 @@ function initialState(): GameState {
     log: buildStoryLog('arrival'),
     discoveries: [],
     timeScale: 1,
+    pausedAt: null,
     pendingReveals: []
   };
 }
@@ -1000,31 +1001,70 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       return resolvePendingSlotActions(state, clockNow());
     }
     case 'SET_TIME_SCALE': {
+      const now = clockNow();
+
+      if (action.scale <= 0) {
+        if (state.pausedAt !== null) {
+          return state;
+        }
+
+        return {
+          ...state,
+          pausedAt: now
+        };
+      }
+
       const nextScale = Math.max(0.25, action.scale);
-      if (nextScale === state.timeScale) {
+      const previousScale = state.timeScale;
+      const pausedAt = state.pausedAt;
+      let adjustedSlots: Record<string, Slot> = state.slots;
+
+      if (pausedAt !== null) {
+        const pausedDuration = Math.max(0, now - pausedAt);
+        const resumedSlots: Record<string, Slot> = {};
+
+        for (const [slotId, slot] of Object.entries(state.slots)) {
+          if (slot.lockedUntil && slot.lockedUntil > pausedAt) {
+            resumedSlots[slotId] = {
+              ...slot,
+              lockedUntil: slot.lockedUntil + pausedDuration
+            };
+          } else {
+            resumedSlots[slotId] = slot;
+          }
+        }
+
+        adjustedSlots = resumedSlots;
+      } else if (nextScale !== previousScale) {
+        adjustedSlots = { ...state.slots };
+      } else {
         return state;
       }
 
-      const now = clockNow();
-      const adjustedSlots: Record<string, Slot> = {};
+      if (nextScale !== previousScale) {
+        const scaledSlots: Record<string, Slot> = {};
 
-      for (const [slotId, slot] of Object.entries(state.slots)) {
-        if (slot.lockedUntil && slot.lockedUntil > now) {
-          const remaining = slot.lockedUntil - now;
-          const baseRemaining = Math.round(remaining * state.timeScale);
-          const scaledRemaining = Math.max(0, Math.round(baseRemaining / nextScale));
-          adjustedSlots[slotId] = {
-            ...slot,
-            lockedUntil: scaledRemaining > 0 ? now + scaledRemaining : now
-          };
-        } else {
-          adjustedSlots[slotId] = slot;
+        for (const [slotId, slot] of Object.entries(adjustedSlots)) {
+          if (slot.lockedUntil && slot.lockedUntil > now) {
+            const remaining = slot.lockedUntil - now;
+            const baseRemaining = Math.round(remaining * previousScale);
+            const scaledRemaining = Math.max(0, Math.round(baseRemaining / nextScale));
+            scaledSlots[slotId] = {
+              ...slot,
+              lockedUntil: scaledRemaining > 0 ? now + scaledRemaining : now
+            };
+          } else {
+            scaledSlots[slotId] = slot;
+          }
         }
+
+        adjustedSlots = scaledSlots;
       }
 
       return {
         ...state,
         timeScale: nextScale,
+        pausedAt: null,
         slots: adjustedSlots
       };
     }

@@ -78,7 +78,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const pendingSlots = Object.values(state.slots).filter((slot) => slot.pendingAction);
-    if (pendingSlots.length === 0) {
+    if (pendingSlots.length === 0 || state.pausedAt !== null) {
       return;
     }
 
@@ -106,7 +106,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     }, Math.max(0, earliestReadyAt - now) + SLOT_ACTION_COMPLETION_TOLERANCE_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [machine, state.slots]);
+  }, [machine, state.pausedAt, state.slots]);
 
   const value = useMemo(
     () => ({

@@ -208,6 +208,7 @@ function SlotView({
   onCardDragEnd,
   timing,
   resources,
+  pausedAt,
   isTimePaused,
   canExploreLocation
 }: {
@@ -228,6 +229,7 @@ function SlotView({
   onCardDragEnd: () => void;
   timing: CardTimingContext;
   resources: Resources;
+  pausedAt: number | null;
   isTimePaused: boolean;
   canExploreLocation: boolean;
 }) {
@@ -252,7 +254,11 @@ function SlotView({
   ];
   const occupantTraits =
     occupantTraitSources.length > 0 ? Array.from(new Set(occupantTraitSources)).join(' · ') : null;
-  const lockRemainingMs = slot.lockedUntil ? Math.max(0, slot.lockedUntil - Date.now()) : 0;
+  const now = Date.now();
+  const pausedElapsedMs = pausedAt !== null ? Math.max(0, now - pausedAt) : 0;
+  const lockRemainingMs = slot.lockedUntil
+    ? Math.max(0, slot.lockedUntil - now + pausedElapsedMs)
+    : 0;
   const displayLockRemainingMs = Math.max(0, Math.round(lockRemainingMs * timing.timeScale));
   const isSlotLocked = Boolean(slot.lockedUntil && lockRemainingMs > 0);
   const isSlotInteractive = slot.unlocked && !isSlotLocked;
@@ -1042,6 +1048,7 @@ export default function App() {
         onCardDragEnd={handleCardDragEnd}
         timing={timingContext}
         resources={state.resources}
+        pausedAt={state.pausedAt}
         isTimePaused={isPaused}
         canExploreLocation={canExplore}
       />

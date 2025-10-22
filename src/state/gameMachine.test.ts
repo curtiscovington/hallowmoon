@@ -279,6 +279,62 @@ describe('card ability behaviors', () => {
   });
 });
 
+describe('time scale controls', () => {
+  it('pauses slot locks and resumes without losing progress', () => {
+    let now = 1000;
+    const machine = createGameMachine({ clock: () => now });
+    let state = machine.initialState();
+
+    const studySlot = buildStudySlot('timing-slot');
+    const initialLock = now + 60000;
+
+    state = {
+      ...state,
+      slots: {
+        ...state.slots,
+        [studySlot.id]: { ...studySlot, lockedUntil: initialLock }
+      }
+    };
+
+    state = machine.reducer(state, { type: 'SET_TIME_SCALE', scale: 0 });
+    expect(state.pausedAt).toBe(1000);
+    expect(state.slots[studySlot.id]?.lockedUntil).toBe(initialLock);
+
+    now += 5000;
+
+    state = machine.reducer(state, { type: 'SET_TIME_SCALE', scale: 1 });
+    expect(state.pausedAt).toBeNull();
+    expect(state.timeScale).toBe(1);
+    expect(state.slots[studySlot.id]?.lockedUntil).toBe(initialLock + 5000);
+  });
+
+  it('rescales remaining lock duration when resuming at a new speed', () => {
+    let now = 2000;
+    const machine = createGameMachine({ clock: () => now });
+    let state = machine.initialState();
+
+    const studySlot = buildStudySlot('timing-slot-fast');
+    const initialLock = now + 60000;
+
+    state = {
+      ...state,
+      slots: {
+        ...state.slots,
+        [studySlot.id]: { ...studySlot, lockedUntil: initialLock }
+      }
+    };
+
+    state = machine.reducer(state, { type: 'SET_TIME_SCALE', scale: 0 });
+    now += 5000;
+
+    state = machine.reducer(state, { type: 'SET_TIME_SCALE', scale: 2 });
+    expect(state.pausedAt).toBeNull();
+    expect(state.timeScale).toBe(2);
+    const resumedSlot = state.slots[studySlot.id];
+    expect(resumedSlot?.lockedUntil).toBe(37000);
+  });
+});
+
 describe('slot behavior registry', () => {
   it('invokes registered behaviors and applies lock overrides', () => {
     const machine = createGameMachine({ clock: () => 0 });
