@@ -98,20 +98,6 @@ function formatSpeedDisplay(value: number): string {
   return Number.isInteger(value) ? `${value}` : value.toFixed(1);
 }
 
-function ResourceTrack({ label, value, icon }: { label: string; value: number; icon: string }) {
-  return (
-    <div className="resource-track">
-      <span className="resource-track__icon" aria-hidden="true">
-        {icon}
-      </span>
-      <div className="resource-track__meta">
-        <span className="resource-track__label">{label}</span>
-        <span className="resource-track__value">{value}</span>
-      </div>
-    </div>
-  );
-}
-
 function CardView({
   card,
   selected = false,
@@ -991,12 +977,6 @@ export default function App() {
     setIsHandOpen(isDesktop);
   }, [isDesktop]);
 
-  const resourceTracks = [
-    { label: 'Coin', value: state.resources.coin, icon: '🪙' },
-    { label: 'Lore', value: state.resources.lore, icon: '📜' },
-    { label: 'Glimmer', value: state.resources.glimmer, icon: '✨' }
-  ];
-
   const chronicleTitleId = 'chronicle-title';
 
   const chronicleContent = (
@@ -1070,14 +1050,6 @@ export default function App() {
 
   return (
     <div className="game-shell">
-      <section className="resource-bar" aria-label="Current resources">
-        <div className="resource-bar__tracks">
-          {resourceTracks.map((track) => (
-            <ResourceTrack key={track.label} {...track} />
-          ))}
-        </div>
-      </section>
-
       <nav className="game-controls" aria-label="Time controls">
         <button
           className="game-controls__button game-controls__button--pause"

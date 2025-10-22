@@ -49,34 +49,6 @@ body {
   padding-bottom: clamp(4rem, 12vw, 5.5rem);
 }
 
-.resource-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  background: linear-gradient(165deg, rgba(41, 32, 67, 0.88), rgba(17, 13, 33, 0.92));
-  border: 1px solid rgba(142, 122, 248, 0.32);
-  border-radius: 1.2rem;
-  padding: clamp(0.9rem, 2.4vw, 1.35rem);
-  box-shadow: 0 16px 38px rgba(5, 3, 16, 0.55);
-}
-
-.resource-bar__tracks {
-  display: flex;
-  gap: clamp(0.65rem, 2vw, 0.9rem);
-  overflow-x: auto;
-  scroll-snap-type: x proximity;
-  padding: 0.1rem 0.3rem 0.3rem;
-}
-
-.resource-bar__tracks::-webkit-scrollbar {
-  height: 4px;
-}
-
-.resource-bar__tracks::-webkit-scrollbar-thumb {
-  background: rgba(204, 189, 255, 0.45);
-  border-radius: 999px;
-}
-
 .game-main {
   display: flex;
   flex-direction: column;
@@ -1172,42 +1144,6 @@ body {
 
 .card-token__footer-row--traits {
   color: #d0c8ff;
-}
-
-.resource-track {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  background: rgba(82, 67, 145, 0.55);
-  border-radius: 999px;
-  padding: 0.5rem 0.85rem 0.5rem 0.5rem;
-  border: 1px solid rgba(173, 158, 255, 0.45);
-  scroll-snap-align: center;
-}
-
-.resource-track__icon {
-  width: 2rem;
-  height: 2rem;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  font-size: 1.1rem;
-}
-
-.resource-track__meta {
-  display: grid;
-  gap: 0.2rem;
-}
-
-.resource-track__label {
-  font-size: 0.9rem;
-  letter-spacing: 0.04em;
-}
-
-.resource-track__value {
-  font-size: 1.2rem;
-  font-weight: 600;
 }
 
 .game-controls {
