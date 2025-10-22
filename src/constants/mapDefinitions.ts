@@ -30,11 +30,11 @@ export interface MapDefinition {
 }
 
 const manorAnchors: MapSlotAnchor[] = [
-  { slotKeys: ['damaged-sanctum', 'veiled-sanctum'], x: 30, y: 38 },
-  { slotKeys: ['damaged-scriptorium', 'scribe-post'], x: 52, y: 34 },
-  { slotKeys: ['damaged-archive', 'night-archive'], x: 32, y: 62 },
-  { slotKeys: ['damaged-circle', 'moonlit-circle'], x: 56, y: 64 },
-  { slotKeys: ['damaged-bedroom', 'astral-chamber'], x: 74, y: 60 },
+  { slotKeys: ['ruined-sanctum', 'veiled-sanctum'], x: 30, y: 38 },
+  { slotKeys: ['ruined-scriptorium', 'scribe-post'], x: 52, y: 34 },
+  { slotKeys: ['ruined-archive', 'night-archive'], x: 32, y: 62 },
+  { slotKeys: ['ruined-circle', 'moonlit-circle'], x: 56, y: 64 },
+  { slotKeys: ['ruined-bedroom', 'astral-chamber'], x: 74, y: 60 },
   { slotKeys: ['chart-room'], x: 20, y: 52 }
 ];
 

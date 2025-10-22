@@ -1032,7 +1032,6 @@ export default function App() {
 
   const selectedCard = selectedCardId ? state.cards[selectedCardId] ?? null : null;
   const draggedCard = draggedCardId ? state.cards[draggedCardId] ?? null : null;
-  const focusedSlot = focusedSlotId ? state.slots[focusedSlotId] ?? null : null;
   const slotForModal = activeSlotModalId ? state.slots[activeSlotModalId] ?? null : null;
 
   useEffect(() => {
@@ -1258,16 +1257,6 @@ export default function App() {
             onDropCard={handleSlotDrop}
             draggedCard={draggedCard}
           />
-          <div className="game-slot-panel" aria-live="polite">
-            {focusedSlot ? (
-              renderSlotCard(focusedSlot)
-            ) : (
-              <div className="game-slot-panel__placeholder">
-                <h3>Select a slot</h3>
-                <p>Tap a marker on the map to inspect its details.</p>
-              </div>
-            )}
-          </div>
         </section>
         {isDesktop ? (
           <aside className="game-log" aria-live="polite">
