@@ -14,7 +14,8 @@ import { CardInstance, LocationTag, Resources, Slot } from './state/types';
 import { SLOT_TYPE_INFO } from './constants/slotTypeInfo';
 import { SlotRevealOverlay } from './components/SlotRevealOverlay';
 import { CardRevealOverlay } from './components/CardRevealOverlay';
-import { SlotMap } from './components/SlotMap';
+import { SlotMap, type SlotMapSlotSummary } from './components/SlotMap';
+import { SlotDetailsOverlay } from './components/SlotDetailsOverlay';
 import { formatDuration } from './utils/time';
 import { SLOT_TEMPLATES } from './state/content';
 import { LOCATION_DEFINITIONS } from './state/slots/location';
@@ -24,6 +25,7 @@ import {
   type MapId,
   findAnchorForSlot
 } from './constants/mapDefinitions';
+import { getSlotActionMetadata } from './utils/slotActions';
 
 const CARD_DRAG_TYPE = 'application/x-hallowmoon-card';
 
@@ -217,7 +219,10 @@ function SlotView({
   resources,
   pausedAt,
   isTimePaused,
-  canExploreLocation
+  canExploreLocation,
+  titleId,
+  descriptionId,
+  displayContext = 'panel'
 }: {
   slot: Slot;
   occupant: CardInstance | null;
@@ -239,6 +244,9 @@ function SlotView({
   pausedAt: number | null;
   isTimePaused: boolean;
   canExploreLocation: boolean;
+  titleId?: string;
+  descriptionId?: string;
+  displayContext?: 'panel' | 'modal';
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 900px)');
@@ -278,6 +286,9 @@ function SlotView({
     }
   }, [isSlotInteractive]);
   const slotClasses = ['slot-card'];
+  if (displayContext === 'modal') {
+    slotClasses.push('slot-card--modal');
+  }
   if (!slot.unlocked) {
     slotClasses.push('slot-card--locked');
   }
@@ -294,6 +305,48 @@ function SlotView({
     slotClasses.push('slot-card--collapsed');
   }
 
+  const actionMetadata = useMemo(
+    () =>
+      getSlotActionMetadata({
+        slot,
+        occupant,
+        assistant,
+        attachments,
+        resources,
+        canExploreLocation,
+        isSlotInteractive
+      }),
+    [
+      slot,
+      occupant,
+      assistant,
+      attachments,
+      resources,
+      canExploreLocation,
+      isSlotInteractive
+    ]
+  );
+
+  const { actionLabel, canActivate: canActivateSlot, availabilityNote: actionAvailabilityNote } =
+    actionMetadata;
+
+  const baseActionLabel = useMemo(() => {
+    switch (slot.type) {
+      case 'study':
+        return 'Study';
+      case 'work':
+        return 'Work';
+      case 'hearth':
+        return 'Rest';
+      case 'location':
+        return slot.state === 'damaged' ? 'Clear' : 'Explore';
+      case 'bedroom':
+        return 'Slumber';
+      default:
+        return 'Activate';
+    }
+  }, [slot]);
+
   const timerClasses = ['slot-card__timer'];
   if (isSlotLocked) {
     timerClasses.push('slot-card__timer--busy');
@@ -307,7 +360,7 @@ function SlotView({
       : `Resolving · ≈ ${formatDuration(displayLockRemainingMs)}`
     : isTimePaused
     ? 'Time paused'
-    : getActivateLabel();
+    : actionLabel ?? baseActionLabel;
 
   const occupantExpiry = occupant ? describeCardExpiry(occupant, timing) : null;
   const assistantExpiry = assistant ? describeCardExpiry(assistant, timing) : null;
@@ -323,102 +376,7 @@ function SlotView({
     slot.pendingAction?.type === 'explore-location'
       ? `Exploration underway within ${slot.name}.`
       : null;
-
-  function getActivateLabel(): string {
-    switch (slot.type) {
-      case 'study': {
-        const personaPresent =
-          (occupant && occupant.type === 'persona') || (assistant && assistant.type === 'persona');
-        const occupantIsDream = Boolean(occupant && occupant.traits.includes('dream'));
-        const occupantIsJournal = Boolean(occupant && occupant.traits.includes('journal'));
-        const hasJournalAttachment = attachments.some((card) => card.traits.includes('journal'));
-
-        if (personaPresent && occupantIsDream && hasJournalAttachment) {
-          return 'Record Dream';
-        }
-        if (personaPresent && (occupantIsJournal || hasJournalAttachment)) {
-          return 'Annotate Journal';
-        }
-        if (occupantIsDream) {
-          return 'Interpret Dream';
-        }
-        return 'Study';
-      }
-      case 'work':
-        return 'Work';
-      case 'hearth':
-        return 'Rest';
-      case 'location':
-        return slot.state === 'damaged' ? 'Clear' : 'Explore';
-      case 'bedroom':
-        return 'Slumber';
-      default:
-        return 'Activate';
-    }
-  }
-
-  const actionLabel = occupant ? getActivateLabel() : null;
-
-  function evaluateActionAvailability(): { canActivate: boolean; note: string | null } {
-    if (!isSlotInteractive || !occupant) {
-      return { canActivate: false, note: null };
-    }
-
-    switch (slot.type) {
-      case 'hearth':
-      case 'work':
-      case 'bedroom': {
-        const canActivate = occupant.type === 'persona';
-        return {
-          canActivate,
-          note: canActivate ? null : 'Only a persona may make use of this slot.'
-        };
-      }
-      case 'location': {
-        if (occupant.type !== 'persona') {
-          return { canActivate: false, note: 'Only a persona can tend to this site.' };
-        }
-        if (slot.state !== 'damaged' && !canExploreLocation) {
-          return {
-            canActivate: false,
-            note: 'All discoverable opportunities have been secured here for now.'
-          };
-        }
-        return { canActivate: true, note: null };
-      }
-      case 'ritual': {
-        if (occupant.type !== 'persona') {
-          return { canActivate: false, note: 'A persona must anchor the ritual.' };
-        }
-        const loreCost = Math.max(2, 2 + slot.level - 1);
-        if (resources.lore < loreCost) {
-          return {
-            canActivate: false,
-            note: `Requires ${loreCost} lore to perform this ritual.`
-          };
-        }
-        return { canActivate: true, note: null };
-      }
-      case 'expedition': {
-        if (occupant.type !== 'persona') {
-          return { canActivate: false, note: 'Only a persona can brave the Umbral Gate.' };
-        }
-        const glimmerCost = 1;
-        if (resources.glimmer < glimmerCost) {
-          return {
-            canActivate: false,
-            note: 'Requires 1 glimmer to light the path beyond the gate.'
-          };
-        }
-        return { canActivate: true, note: null };
-      }
-      default:
-        return { canActivate: true, note: null };
-    }
-  }
-
-  const { canActivate: actionRequirementsMet, note: actionAvailabilityNote } = evaluateActionAvailability();
-  const shouldShowPrimaryAction = Boolean(actionLabel && actionRequirementsMet);
+  const shouldShowPrimaryAction = Boolean(actionLabel && canActivateSlot);
 
   function acceptsCard(event: DragEvent<HTMLElement>) {
     return event.dataTransfer?.types.includes(CARD_DRAG_TYPE) ?? false;
@@ -518,7 +476,7 @@ function SlotView({
     : hasSelectedCard
     ? `Assign ${selectedCardName ?? 'selected card'} to ${slot.name}`
     : occupant
-    ? actionRequirementsMet
+    ? canActivateSlot
       ? `${actionLabel ?? 'Activate'} ${slot.name}`
       : `${slot.name} cannot be activated right now`
     : `Assign a card to ${slot.name}`;
@@ -531,7 +489,7 @@ function SlotView({
       onClick(slot.id);
       return;
     }
-    if (occupant && actionRequirementsMet) {
+    if (occupant && canActivateSlot) {
       onActivate(slot.id);
     }
   }
@@ -592,7 +550,9 @@ function SlotView({
             </span>
             <span className="slot-card__type-label">{slotTypeInfo.label}</span>
           </span>
-          <h3 className="slot-card__name">{slot.name}</h3>
+          <h3 id={titleId} className="slot-card__name">
+            {slot.name}
+          </h3>
         </div>
         <div className="slot-card__header-actions">
           <span className="slot-card__level">Lv {slot.level}</span>
@@ -609,7 +569,9 @@ function SlotView({
           ) : null}
         </div>
       </header>
-      <p className="slot-card__description">{slot.description}</p>
+      <p id={descriptionId} className="slot-card__description">
+        {slot.description}
+      </p>
       <div className="slot-card__status-row">
         <span className="slot-card__status-label">{occupancyLabel}</span>
         <div className={timerClasses.join(' ')} role="timer">
@@ -788,11 +750,15 @@ export default function App() {
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
   const [activeMapId, setActiveMapId] = useState<MapId>('overworld');
   const [focusedSlotId, setFocusedSlotId] = useState<string | null>(null);
+  const [activeSlotModalId, setActiveSlotModalId] = useState<string | null>(null);
   const [isChronicleOpen, setIsChronicleOpen] = useState(false);
   const [isHandOpen, setIsHandOpen] = useState(isDesktop);
   const handPanelId = useId();
+  const slotModalTitleId = useId();
+  const slotModalDescriptionId = useId();
   const [slotRevealQueue, setSlotRevealQueue] = useState<string[]>([]);
   const previousSlotIdsRef = useRef<Set<string>>(new Set(Object.keys(state.slots)));
+  const previousAvailableMapsRef = useRef<MapId[]>([]);
   const manualPauseRef = useRef(false);
   const autoPausedByRevealRef = useRef(false);
 
@@ -898,6 +864,93 @@ export default function App() {
 
   const slots = useMemo(() => Object.values(state.slots), [state.slots]);
 
+  const locationExplorationAvailability = useMemo(() => {
+    const availability: Partial<Record<LocationTag, boolean>> = {};
+    const existingKeys = new Set(slots.map((slotEntry) => slotEntry.key));
+
+    Object.values(LOCATION_DEFINITIONS).forEach((definition) => {
+      const hasUndiscoveredSite = definition.discoverableTemplateKeys.some((templateKey) => {
+        const template = SLOT_TEMPLATES[templateKey];
+        if (!template) {
+          return false;
+        }
+        const restoredTemplate = template.repair ? SLOT_TEMPLATES[template.repair.targetKey] : null;
+        const restoredKey = restoredTemplate?.key ?? null;
+
+        if (existingKeys.has(template.key)) {
+          return false;
+        }
+        if (restoredKey && existingKeys.has(restoredKey)) {
+          return false;
+        }
+        return true;
+      });
+
+      availability[definition.key] = definition.allowExplorationWhenExhausted || hasUndiscoveredSite;
+    });
+
+    return availability;
+  }, [slots]);
+
+  const slotSummaries = useMemo<Record<string, SlotMapSlotSummary>>(() => {
+    const summaries: Record<string, SlotMapSlotSummary> = {};
+    const now = Date.now();
+    const pausedElapsedMs = state.pausedAt !== null ? Math.max(0, now - state.pausedAt) : 0;
+
+    for (const slot of slots) {
+      const occupant = slot.occupantId ? state.cards[slot.occupantId] ?? null : null;
+      const assistant = slot.assistantId ? state.cards[slot.assistantId] ?? null : null;
+      const attachments = slot.attachedCardIds
+        .map((cardId) => state.cards[cardId])
+        .filter((card): card is CardInstance => Boolean(card));
+      const isHeroInSlot = Boolean(
+        (occupant && occupant.id === state.heroCardId) || (assistant && assistant.id === state.heroCardId)
+      );
+      const canExplore =
+        slot.type === 'location' && slot.state !== 'damaged'
+          ? slot.location
+            ? locationExplorationAvailability[slot.location] ?? true
+            : true
+          : true;
+      const lockRemainingMs = slot.lockedUntil
+        ? Math.max(0, slot.lockedUntil - now + pausedElapsedMs)
+        : 0;
+      const isLocked = Boolean(slot.lockedUntil && lockRemainingMs > 0);
+      const isSlotInteractive = slot.unlocked && !isLocked;
+      const actionMetadata = getSlotActionMetadata({
+        slot,
+        occupant,
+        assistant,
+        attachments,
+        resources: state.resources,
+        canExploreLocation: canExplore,
+        isSlotInteractive
+      });
+
+      summaries[slot.id] = {
+        occupant,
+        assistant,
+        attachments,
+        isHeroInSlot,
+        canExploreLocation: canExplore,
+        isSlotInteractive,
+        isLocked,
+        actionLabel: actionMetadata.actionLabel,
+        canActivate: actionMetadata.canActivate,
+        availabilityNote: actionMetadata.availabilityNote
+      } satisfies SlotMapSlotSummary;
+    }
+
+    return summaries;
+  }, [
+    slots,
+    state.cards,
+    state.heroCardId,
+    state.resources,
+    state.pausedAt,
+    locationExplorationAvailability
+  ]);
+
   const slotsByMap = useMemo(() => {
     const mapping: Record<MapId, Slot[]> = {
       overworld: [],
@@ -923,12 +976,20 @@ export default function App() {
   }, [slots]);
 
   const availableMaps = useMemo(() => {
-    const mapsWithSites = MAP_SEQUENCE.filter((id) => slotsByMap[id].length > 0);
+    const mapsWithSites = MAP_SEQUENCE.filter((id) => {
+      if (slotsByMap[id].length > 0) {
+        return true;
+      }
+      const definition = MAP_DEFINITIONS[id];
+      return slots.some(
+        (slot) => slot.location && definition.focusLocations.includes(slot.location)
+      );
+    });
     if (!mapsWithSites.includes('overworld')) {
       mapsWithSites.unshift('overworld');
     }
     return Array.from(new Set<MapId>(mapsWithSites));
-  }, [slotsByMap]);
+  }, [slotsByMap, slots]);
 
   const activeMapSlots = slotsByMap[activeMapId] ?? [];
 
@@ -936,9 +997,17 @@ export default function App() {
     if (availableMaps.length === 0) {
       return;
     }
+
+    const previousMaps = previousAvailableMapsRef.current;
+    const newlyAdded = availableMaps.find((id) => !previousMaps.includes(id));
+
     if (!availableMaps.includes(activeMapId)) {
       setActiveMapId(availableMaps[0]);
+    } else if (newlyAdded && newlyAdded !== 'overworld') {
+      setActiveMapId(newlyAdded);
     }
+
+    previousAvailableMapsRef.current = [...availableMaps];
   }, [activeMapId, availableMaps]);
 
   useEffect(() => {
@@ -956,41 +1025,21 @@ export default function App() {
     });
   }, [activeMapId, slotsByMap]);
 
-  const locationExplorationAvailability = useMemo(() => {
-    const availability: Partial<Record<LocationTag, boolean>> = {};
-    const existingKeys = new Set(Object.values(state.slots).map((slotEntry) => slotEntry.key));
-
-    Object.values(LOCATION_DEFINITIONS).forEach((definition) => {
-      const hasUndiscoveredSite = definition.discoverableTemplateKeys.some((templateKey) => {
-        const template = SLOT_TEMPLATES[templateKey];
-        if (!template) {
-          return false;
-        }
-        const restoredTemplate = template.repair ? SLOT_TEMPLATES[template.repair.targetKey] : null;
-        const restoredKey = restoredTemplate?.key ?? null;
-
-        if (existingKeys.has(template.key)) {
-          return false;
-        }
-        if (restoredKey && existingKeys.has(restoredKey)) {
-          return false;
-        }
-        return true;
-      });
-
-      availability[definition.key] = definition.allowExplorationWhenExhausted || hasUndiscoveredSite;
-    });
-
-    return availability;
-  }, [state.slots]);
-
   const timingContext = useMemo<CardTimingContext>(
     () => ({ cycleDurationMs, timeToNextCycleMs: timeToNextCycle, timeScale: state.timeScale }),
     [cycleDurationMs, state.timeScale, timeToNextCycle]
   );
 
   const selectedCard = selectedCardId ? state.cards[selectedCardId] ?? null : null;
+  const draggedCard = draggedCardId ? state.cards[draggedCardId] ?? null : null;
   const focusedSlot = focusedSlotId ? state.slots[focusedSlotId] ?? null : null;
+  const slotForModal = activeSlotModalId ? state.slots[activeSlotModalId] ?? null : null;
+
+  useEffect(() => {
+    if (activeSlotModalId && !slotForModal) {
+      setActiveSlotModalId(null);
+    }
+  }, [activeSlotModalId, slotForModal]);
 
   function handleCardSelect(cardId: string) {
     setSelectedCardId((prev) => (prev === cardId ? null : cardId));
@@ -1007,6 +1056,14 @@ export default function App() {
 
   function handleMapSlotFocus(slotId: string) {
     setFocusedSlotId(slotId);
+  }
+
+  function handleOpenSlotDetails(slotId: string) {
+    setActiveSlotModalId(slotId);
+  }
+
+  function handleCloseSlotModal() {
+    setActiveSlotModalId(null);
   }
 
   function handleMapChange(mapId: MapId) {
@@ -1093,21 +1150,16 @@ export default function App() {
     </>
   );
 
-  function renderSlotCard(slot: Slot) {
-    const occupant = slot.occupantId ? state.cards[slot.occupantId] ?? null : null;
-    const assistant = slot.assistantId ? state.cards[slot.assistantId] ?? null : null;
-    const attachments = slot.attachedCardIds
-      .map((cardId) => state.cards[cardId])
-      .filter((card): card is CardInstance => Boolean(card));
-    const isHeroInSlot = Boolean(
-      (occupant && occupant.id === state.heroCardId) || (assistant && assistant.id === state.heroCardId)
-    );
-    const canExplore =
-      slot.type === 'location' && slot.state !== 'damaged'
-        ? slot.location
-          ? locationExplorationAvailability[slot.location] ?? true
-          : true
-        : true;
+  function renderSlotCard(
+    slot: Slot,
+    options?: { titleId?: string; descriptionId?: string; displayContext?: 'panel' | 'modal' }
+  ) {
+    const summary = slotSummaries[slot.id];
+    const occupant = summary?.occupant ?? null;
+    const assistant = summary?.assistant ?? null;
+    const attachments = summary?.attachments ?? [];
+    const isHeroInSlot = summary?.isHeroInSlot ?? false;
+    const canExplore = summary?.canExploreLocation ?? true;
 
     return (
       <SlotView
@@ -1132,6 +1184,9 @@ export default function App() {
         pausedAt={state.pausedAt}
         isTimePaused={isPaused}
         canExploreLocation={canExplore}
+        titleId={options?.titleId}
+        descriptionId={options?.descriptionId}
+        displayContext={options?.displayContext ?? 'panel'}
       />
     );
   }
@@ -1195,11 +1250,13 @@ export default function App() {
             availableMaps={availableMaps}
             onMapChange={handleMapChange}
             slots={activeMapSlots}
+            slotSummaries={slotSummaries}
             selectedSlotId={focusedSlotId}
             onFocusSlot={handleMapSlotFocus}
+            onOpenSlotDetails={handleOpenSlotDetails}
+            onActivateSlot={activateSlot}
             onDropCard={handleSlotDrop}
-            draggedCardId={draggedCardId}
-            pausedAt={state.pausedAt}
+            draggedCard={draggedCard}
           />
           <div className="game-slot-panel" aria-live="polite">
             {focusedSlot ? (
@@ -1311,6 +1368,19 @@ export default function App() {
             </div>
           </div>
         </div>
+      ) : null}
+      {slotForModal ? (
+        <SlotDetailsOverlay
+          labelledBy={slotModalTitleId}
+          describedBy={slotModalDescriptionId}
+          onClose={handleCloseSlotModal}
+        >
+          {renderSlotCard(slotForModal, {
+            titleId: slotModalTitleId,
+            descriptionId: slotModalDescriptionId,
+            displayContext: 'modal'
+          })}
+        </SlotDetailsOverlay>
       ) : null}
     </div>
   );
