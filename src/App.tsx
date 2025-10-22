@@ -773,7 +773,7 @@ export default function App() {
     acknowledgeCardReveal
   } = useGame();
   const isDesktop = useMediaQuery('(min-width: 900px)');
-  const [isPaused, setIsPaused] = useState(false);
+  const [isPaused, setIsPausedState] = useState(false);
   const [speed, setSpeed] = useState<SpeedOption>(1);
   const cycleDurationMs = BASE_CYCLE_MS;
   const [timeToNextCycle, setTimeToNextCycle] = useState(cycleDurationMs);
@@ -784,7 +784,17 @@ export default function App() {
   const handPanelId = useId();
   const [slotRevealQueue, setSlotRevealQueue] = useState<string[]>([]);
   const previousSlotIdsRef = useRef<Set<string>>(new Set(Object.keys(state.slots)));
+  const manualPauseRef = useRef(false);
   const autoPausedByRevealRef = useRef(false);
+
+  const setPausedManual = (value: boolean) => {
+    manualPauseRef.current = value;
+    setIsPausedState(value);
+  };
+
+  const setPausedAuto = (value: boolean) => {
+    setIsPausedState(value);
+  };
 
   useEffect(() => {
     if (isPaused) {
@@ -823,14 +833,20 @@ export default function App() {
 
   useEffect(() => {
     const pendingCardReveals = state.pendingReveals.length;
-    if (slotRevealQueue.length > 0 || pendingCardReveals > 0) {
-      if (!isPaused) {
+    const hasReveals = slotRevealQueue.length > 0 || pendingCardReveals > 0;
+
+    if (hasReveals) {
+      if (!manualPauseRef.current) {
         autoPausedByRevealRef.current = true;
-        setIsPaused(true);
+        if (!isPaused) {
+          setPausedAuto(true);
+        }
       }
-    } else if (autoPausedByRevealRef.current) {
+    } else {
       autoPausedByRevealRef.current = false;
-      setIsPaused(false);
+      if (!manualPauseRef.current && isPaused) {
+        setPausedAuto(false);
+      }
     }
   }, [isPaused, slotRevealQueue.length, state.pendingReveals.length]);
 
@@ -1063,7 +1079,7 @@ export default function App() {
           type="button"
           aria-label={isPaused ? 'Resume time' : 'Pause time'}
           aria-pressed={isPaused}
-          onClick={() => setIsPaused((prev) => !prev)}
+          onClick={() => setPausedManual(!isPaused)}
         >
           <span className="sr-only">{isPaused ? 'Resume time' : 'Pause time'}</span>
           <span aria-hidden="true" className="game-controls__icon">
