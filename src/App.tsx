@@ -14,9 +14,16 @@ import { CardInstance, LocationTag, Resources, Slot } from './state/types';
 import { SLOT_TYPE_INFO } from './constants/slotTypeInfo';
 import { SlotRevealOverlay } from './components/SlotRevealOverlay';
 import { CardRevealOverlay } from './components/CardRevealOverlay';
+import { SlotMap } from './components/SlotMap';
 import { formatDuration } from './utils/time';
 import { SLOT_TEMPLATES } from './state/content';
 import { LOCATION_DEFINITIONS } from './state/slots/location';
+import {
+  MAP_DEFINITIONS,
+  MAP_SEQUENCE,
+  type MapId,
+  findAnchorForSlot
+} from './constants/mapDefinitions';
 
 const CARD_DRAG_TYPE = 'application/x-hallowmoon-card';
 
@@ -779,6 +786,8 @@ export default function App() {
   const [timeToNextCycle, setTimeToNextCycle] = useState(cycleDurationMs);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
+  const [activeMapId, setActiveMapId] = useState<MapId>('overworld');
+  const [focusedSlotId, setFocusedSlotId] = useState<string | null>(null);
   const [isChronicleOpen, setIsChronicleOpen] = useState(false);
   const [isHandOpen, setIsHandOpen] = useState(isDesktop);
   const handPanelId = useId();
@@ -888,20 +897,64 @@ export default function App() {
   );
 
   const slots = useMemo(() => Object.values(state.slots), [state.slots]);
-  const locationSlots = useMemo(
-    () =>
-      slots
-        .filter((slot) => slot.type === 'location')
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [slots]
-  );
-  const nonLocationSlots = useMemo(
-    () =>
-      slots
-        .filter((slot) => slot.type !== 'location')
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [slots]
-  );
+
+  const slotsByMap = useMemo(() => {
+    const mapping: Record<MapId, Slot[]> = {
+      overworld: [],
+      manor: [],
+      town: [],
+      forest: []
+    };
+
+    for (const slot of slots) {
+      for (const mapId of MAP_SEQUENCE) {
+        const definition = MAP_DEFINITIONS[mapId];
+        if (findAnchorForSlot(definition, slot.key)) {
+          mapping[mapId].push(slot);
+        }
+      }
+    }
+
+    for (const mapId of MAP_SEQUENCE) {
+      mapping[mapId].sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    return mapping;
+  }, [slots]);
+
+  const availableMaps = useMemo(() => {
+    const mapsWithSites = MAP_SEQUENCE.filter((id) => slotsByMap[id].length > 0);
+    if (!mapsWithSites.includes('overworld')) {
+      mapsWithSites.unshift('overworld');
+    }
+    return Array.from(new Set<MapId>(mapsWithSites));
+  }, [slotsByMap]);
+
+  const activeMapSlots = slotsByMap[activeMapId] ?? [];
+
+  useEffect(() => {
+    if (availableMaps.length === 0) {
+      return;
+    }
+    if (!availableMaps.includes(activeMapId)) {
+      setActiveMapId(availableMaps[0]);
+    }
+  }, [activeMapId, availableMaps]);
+
+  useEffect(() => {
+    const currentSlots = slotsByMap[activeMapId] ?? [];
+    if (currentSlots.length === 0) {
+      setFocusedSlotId(null);
+      return;
+    }
+
+    setFocusedSlotId((prev) => {
+      if (prev && currentSlots.some((slot) => slot.id === prev)) {
+        return prev;
+      }
+      return currentSlots[0].id;
+    });
+  }, [activeMapId, slotsByMap]);
 
   const locationExplorationAvailability = useMemo(() => {
     const availability: Partial<Record<LocationTag, boolean>> = {};
@@ -937,6 +990,7 @@ export default function App() {
   );
 
   const selectedCard = selectedCardId ? state.cards[selectedCardId] ?? null : null;
+  const focusedSlot = focusedSlotId ? state.slots[focusedSlotId] ?? null : null;
 
   function handleCardSelect(cardId: string) {
     setSelectedCardId((prev) => (prev === cardId ? null : cardId));
@@ -951,12 +1005,22 @@ export default function App() {
     setDraggedCardId(null);
   }
 
+  function handleMapSlotFocus(slotId: string) {
+    setFocusedSlotId(slotId);
+  }
+
+  function handleMapChange(mapId: MapId) {
+    setActiveMapId(mapId);
+  }
+
   function handleSlotClick(slotId: string) {
     if (!selectedCardId) {
+      setFocusedSlotId(slotId);
       return;
     }
     moveCardToSlot(selectedCardId, slotId);
     setSelectedCardId(null);
+    setFocusedSlotId(slotId);
     if (!isDesktop) {
       setIsHandOpen(false);
     }
@@ -966,6 +1030,7 @@ export default function App() {
     moveCardToSlot(cardId, slotId);
     setDraggedCardId(null);
     setSelectedCardId(null);
+    setFocusedSlotId(slotId);
     if (!isDesktop) {
       setIsHandOpen(false);
     }
@@ -1124,15 +1189,28 @@ export default function App() {
       </nav>
 
       <main className="game-main">
-        {locationSlots.length > 0 ? (
-          <section className="game-locations" aria-label="Known locations">
-            <div className="slots-grid slots-grid--locations">
-              {locationSlots.map((slot) => renderSlotCard(slot))}
-            </div>
-          </section>
-        ) : null}
-        <section className="slots-grid" aria-label="Available slots">
-          {nonLocationSlots.map((slot) => renderSlotCard(slot))}
+        <section className="game-map-panel" aria-label="Territory overview">
+          <SlotMap
+            mapId={activeMapId}
+            availableMaps={availableMaps}
+            onMapChange={handleMapChange}
+            slots={activeMapSlots}
+            selectedSlotId={focusedSlotId}
+            onFocusSlot={handleMapSlotFocus}
+            onDropCard={handleSlotDrop}
+            draggedCardId={draggedCardId}
+            pausedAt={state.pausedAt}
+          />
+          <div className="game-slot-panel" aria-live="polite">
+            {focusedSlot ? (
+              renderSlotCard(focusedSlot)
+            ) : (
+              <div className="game-slot-panel__placeholder">
+                <h3>Select a slot</h3>
+                <p>Tap a marker on the map to inspect its details.</p>
+              </div>
+            )}
+          </div>
         </section>
         {isDesktop ? (
           <aside className="game-log" aria-live="polite">

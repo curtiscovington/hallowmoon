@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 540" role="img" aria-labelledby="title desc">
+  <title id="title">Moonlit town map</title>
+  <desc id="desc">Compact map of the town plaza with highlighted districts.</desc>
+  <defs>
+    <linearGradient id="town-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#182133" />
+      <stop offset="100%" stop-color="#090d18" />
+    </linearGradient>
+    <radialGradient id="town-halo" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#3f5ca8" stop-opacity="0.45" />
+      <stop offset="100%" stop-color="#0d1220" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="720" height="540" fill="url(#town-bg)" />
+  <rect width="720" height="540" fill="url(#town-halo)" />
+  <g opacity="0.3" stroke="#274260" stroke-width="2">
+    <path d="M100 120 H620" />
+    <path d="M100 200 H620" />
+    <path d="M100 280 H620" />
+    <path d="M100 360 H620" />
+    <path d="M100 440 H620" />
+    <path d="M160 80 V480" />
+    <path d="M240 80 V480" />
+    <path d="M320 80 V480" />
+    <path d="M400 80 V480" />
+    <path d="M480 80 V480" />
+    <path d="M560 80 V480" />
+  </g>
+  <circle cx="360" cy="260" r="110" fill="#1f2c4a" opacity="0.75" stroke="#5e74c4" stroke-width="3" />
+  <g fill="#1b2740" stroke="#7e8dd8" stroke-width="3" opacity="0.85">
+    <rect x="190" y="170" width="120" height="110" rx="18" />
+    <rect x="330" y="140" width="130" height="120" rx="20" />
+    <rect x="360" y="300" width="140" height="110" rx="22" />
+  </g>
+  <g fill="#6075ff" opacity="0.35">
+    <circle cx="250" cy="220" r="42" />
+    <circle cx="390" cy="190" r="46" />
+    <circle cx="430" cy="340" r="48" />
+  </g>
+  <path
+    d="M250 220 C310 220 350 240 390 210"
+    fill="none"
+    stroke="#7190ff"
+    stroke-width="10"
+    stroke-linecap="round"
+    opacity="0.5"
+  />
+  <path
+    d="M390 210 C400 250 410 280 430 320"
+    fill="none"
+    stroke="#7190ff"
+    stroke-width="8"
+    stroke-linecap="round"
+    opacity="0.45"
+  />
+</svg>

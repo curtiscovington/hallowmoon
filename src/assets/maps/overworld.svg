@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title desc">
+  <title id="title">HallowMoon overworld map</title>
+  <desc id="desc">A stylised night map showing the manor hill, town valley, and forest glade.</desc>
+  <defs>
+    <radialGradient id="overworld-halo" cx="50%" cy="15%" r="70%">
+      <stop offset="0%" stop-color="#5340a8" stop-opacity="0.85" />
+      <stop offset="45%" stop-color="#2b1d52" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#0d081c" />
+    </radialGradient>
+    <linearGradient id="overworld-water" x1="0%" x2="0%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#243e6c" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#12223a" stop-opacity="0.8" />
+    </linearGradient>
+    <linearGradient id="overworld-path" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#8c6cff" stop-opacity="0.65" />
+      <stop offset="100%" stop-color="#6a4fed" stop-opacity="0.35" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#overworld-halo)" />
+  <path
+    d="M0 420 Q180 350 360 380 T720 360 Q780 370 800 330 V600 H0 Z"
+    fill="url(#overworld-water)"
+    opacity="0.8"
+  />
+  <path
+    d="M60 220 Q160 140 300 150 T560 180 Q660 210 720 300 L520 340 Q420 360 320 340 Q200 320 120 300 Z"
+    fill="#1f1538"
+    opacity="0.9"
+  />
+  <path
+    d="M120 260 Q190 200 280 210 T420 250 Q520 300 620 320 L520 360 Q420 380 320 360 Q220 340 140 320 Z"
+    fill="#2d1f52"
+    opacity="0.85"
+  />
+  <g opacity="0.9">
+    <path
+      d="M520 120 Q560 70 630 80 T720 140 L690 210 Q640 190 600 210 Q560 230 510 220 Z"
+      fill="#372263"
+    />
+    <path
+      d="M150 360 Q200 320 270 330 T360 380 L340 420 Q280 410 220 430 Q170 440 140 410 Z"
+      fill="#221546"
+    />
+    <path
+      d="M460 400 Q520 360 600 370 T700 420 L680 470 Q600 450 540 480 Q500 500 470 470 Z"
+      fill="#23143b"
+    />
+  </g>
+  <path
+    d="M220 360 Q320 280 420 260 T620 300"
+    fill="none"
+    stroke="url(#overworld-path)"
+    stroke-width="14"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.55"
+  />
+  <path
+    d="M220 360 Q260 340 300 330 T380 300"
+    fill="none"
+    stroke="url(#overworld-path)"
+    stroke-width="10"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.5"
+  />
+  <g opacity="0.9">
+    <circle cx="210" cy="340" r="36" fill="#3f2c75" />
+    <circle cx="470" cy="250" r="42" fill="#453191" />
+    <circle cx="640" cy="320" r="48" fill="#283060" />
+  </g>
+  <g fill="#fff0" stroke="#bba9ff" stroke-width="3" stroke-dasharray="6 10" opacity="0.35">
+    <ellipse cx="210" cy="340" rx="70" ry="50" />
+    <ellipse cx="470" cy="250" rx="90" ry="60" />
+    <ellipse cx="640" cy="320" rx="100" ry="70" />
+  </g>
+</svg>
