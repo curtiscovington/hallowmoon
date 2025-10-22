@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 540" role="img" aria-labelledby="title desc">
+  <title id="title">Manor floor map</title>
+  <desc id="desc">Blueprint-inspired illustration of interconnected manor rooms.</desc>
+  <defs>
+    <linearGradient id="manor-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1030" />
+      <stop offset="100%" stop-color="#0c0718" />
+    </linearGradient>
+    <radialGradient id="manor-glow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#4f3aa3" stop-opacity="0.55" />
+      <stop offset="100%" stop-color="#140b28" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="720" height="540" fill="url(#manor-bg)" />
+  <rect width="720" height="540" fill="url(#manor-glow)" />
+  <g fill="none" stroke="#3d2f75" stroke-width="4" stroke-dasharray="16 12">
+    <path d="M120 110 H600 V430 H120 Z" />
+  </g>
+  <g fill="#21163b" stroke="#6f5ad6" stroke-width="3" opacity="0.85">
+    <rect x="150" y="140" width="140" height="110" rx="18" />
+    <rect x="300" y="120" width="150" height="130" rx="20" />
+    <rect x="470" y="150" width="120" height="120" rx="20" />
+    <rect x="150" y="270" width="160" height="140" rx="22" />
+    <rect x="330" y="280" width="130" height="130" rx="20" />
+    <rect x="490" y="300" width="120" height="110" rx="20" />
+  </g>
+  <g fill="none" stroke="#8a78ff" stroke-width="6" stroke-linecap="round" opacity="0.7">
+    <path d="M220 200 H310" />
+    <path d="M370 185 H470" />
+    <path d="M250 320 H340" />
+    <path d="M420 340 H490" />
+    <path d="M320 250 V310" />
+  </g>
+  <g fill="#8a78ff" opacity="0.35">
+    <circle cx="220" cy="195" r="40" />
+    <circle cx="370" cy="180" r="42" />
+    <circle cx="520" cy="210" r="40" />
+    <circle cx="230" cy="320" r="48" />
+    <circle cx="400" cy="340" r="44" />
+    <circle cx="540" cy="360" r="42" />
+  </g>
+</svg>
