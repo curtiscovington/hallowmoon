@@ -1,4 +1,5 @@
 import type { SlotBehavior, SlotBehaviorUtils } from './behaviors';
+import { ensurePersonaOccupant } from './helpers';
 
 const DREAM_TITLES = [
   'Silver Staircases',
@@ -35,22 +36,19 @@ function createDreamCard(utils: SlotBehaviorUtils) {
 
 export const bedroomBehavior: SlotBehavior = {
   activate({ state, slot, log }, utils) {
-    if (!slot.occupantId) {
-      return {
-        state,
-        log: utils.appendLog(log, 'Let a persona rest within the bedroom to invite a dream.'),
-        performed: false
-      };
+    const occupant = ensurePersonaOccupant(
+      { state, slot, log },
+      utils,
+      {
+        message: 'Let a persona rest within the bedroom to invite a dream.',
+        invalidMessage: 'Only a persona may slumber deeply enough to dream here.'
+      }
+    );
+    if ('result' in occupant) {
+      return occupant.result;
     }
 
-    const persona = state.cards[slot.occupantId];
-    if (!persona || persona.type !== 'persona') {
-      return {
-        state,
-        log: utils.appendLog(log, 'Only a persona may slumber deeply enough to dream here.'),
-        performed: false
-      };
-    }
+    const persona = occupant.card;
 
     const dream = createDreamCard(utils);
     const stagedDream = { ...dream, location: { area: 'lost' } };

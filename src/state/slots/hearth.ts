@@ -1,40 +1,35 @@
 import type { SlotBehavior } from './behaviors';
+import { ensurePersonaOccupant, formatResourceDelta } from './helpers';
 
 export const hearthBehavior: SlotBehavior = {
   activate({ state, slot, log }, utils) {
-    if (!slot.occupantId) {
-      return {
-        state,
-        log: utils.appendLog(log, 'The sanctum waits for someone to rest within it.'),
-        performed: false
-      };
+    const occupant = ensurePersonaOccupant(
+      { state, slot, log },
+      utils,
+      {
+        message: 'The sanctum waits for someone to rest within it.',
+        invalidMessage: 'Only a living persona can draw the sanctum’s calm.'
+      }
+    );
+    if ('result' in occupant) {
+      return occupant.result;
     }
 
-    const card = state.cards[slot.occupantId];
-    if (!card || card.type !== 'persona') {
-      return {
-        state,
-        log: utils.appendLog(log, 'Only a living persona can draw the sanctum’s calm.'),
-        performed: false
-      };
-    }
+    const card = occupant.card;
 
     const loreGain = 1 + Math.floor(slot.level / 2);
     const glimmerGain = slot.level >= 3 ? 1 : 0;
-
-    const nextResources = utils.applyResources(state.resources, {
+    const resourceDelta = {
       lore: loreGain,
       glimmer: glimmerGain
-    });
+    } as const;
 
-    const fragments = [`${loreGain} lore`];
-    if (glimmerGain > 0) {
-      fragments.push(`${glimmerGain} glimmer`);
-    }
+    const nextResources = utils.applyResources(state.resources, resourceDelta);
+    const gainSummary = formatResourceDelta(resourceDelta);
 
     const nextLog = utils.appendLog(
       log,
-      `${card.name} communes with the Veiled Sanctum, gaining ${fragments.join(' and ')}.`
+      `${card.name} communes with the Veiled Sanctum, gaining ${gainSummary}.`
     );
 
     return {

@@ -2,6 +2,7 @@ import { formatDurationLabel } from '../../utils/time';
 import { SLOT_LOCK_BASE_MS, SLOT_TEMPLATES } from '../content';
 import type { GameState, Slot } from '../types';
 import type { SlotBehavior, SlotBehaviorUtils } from './behaviors';
+import { ensurePersonaOccupant } from './helpers';
 
 export const MANOR_ROOM_TEMPLATE_KEYS = [
   'damaged-sanctum',
@@ -24,22 +25,19 @@ function findMissingManorKeys(state: GameState): ManorRoomTemplateKey[] {
 }
 
 function exploreManor(state: GameState, slot: Slot, log: string[], utils: SlotBehaviorUtils) {
-  if (!slot.occupantId) {
-    return {
-      state,
-      log: utils.appendLog(log, 'Send a persona into the manor before attempting to explore it.'),
-      performed: false
-    };
+  const occupant = ensurePersonaOccupant(
+    { state, slot, log },
+    utils,
+    {
+      message: 'Send a persona into the manor before attempting to explore it.',
+      invalidMessage: 'Only a living persona can unveil the manor’s halls.'
+    }
+  );
+  if ('result' in occupant) {
+    return occupant.result;
   }
 
-  const persona = state.cards[slot.occupantId];
-  if (!persona || persona.type !== 'persona') {
-    return {
-      state,
-      log: utils.appendLog(log, 'Only a living persona can unveil the manor’s halls.'),
-      performed: false
-    };
-  }
+  const persona = occupant.card;
 
   const missingKeys = findMissingManorKeys(state);
   if (missingKeys.length === 0) {
@@ -86,22 +84,19 @@ function repairManorRoom(state: GameState, slot: Slot, log: string[], utils: Slo
     return { state, log, performed: false };
   }
 
-  if (!slot.occupantId) {
-    return {
-      state,
-      log: utils.appendLog(log, 'Assign a persona to clear the debris from this room.'),
-      performed: false
-    };
+  const occupant = ensurePersonaOccupant(
+    { state, slot, log },
+    utils,
+    {
+      message: 'Assign a persona to clear the debris from this room.',
+      invalidMessage: 'A persona must brave the dust and cobwebs to restore the room.'
+    }
+  );
+  if ('result' in occupant) {
+    return occupant.result;
   }
 
-  const persona = state.cards[slot.occupantId];
-  if (!persona || persona.type !== 'persona') {
-    return {
-      state,
-      log: utils.appendLog(log, 'A persona must brave the dust and cobwebs to restore the room.'),
-      performed: false
-    };
-  }
+  const persona = occupant.card;
 
   const remainingMs = slot.repair.remaining * SLOT_LOCK_BASE_MS;
   const message = slot.repairStarted
