@@ -288,7 +288,9 @@ function completeLocationExploration(state: GameState, slotId: string, log: stri
 
   const remainingAfterReveal = missingKeys.length > 0 ? missingKeys.length - 1 : 0;
   const shouldRemoveSlot = Boolean(definition?.removeWhenComplete && missingKeys.length <= 1);
-  const willUnlockTown = Boolean(definition?.key === 'manor' && shouldRemoveSlot);
+  const willUnlockTown = Boolean(
+    definition?.key === 'manor' && revealedSites.length > 0 && remainingAfterReveal === 0
+  );
 
   if (shouldRemoveSlot) {
     delete updatedSlots[slotId];

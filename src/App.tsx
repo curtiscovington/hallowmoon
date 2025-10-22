@@ -220,6 +220,9 @@ function SlotView({
   pausedAt,
   isTimePaused,
   canExploreLocation,
+  availableMaps,
+  currentMapId,
+  onTravelToMap,
   titleId,
   descriptionId,
   displayContext = 'panel'
@@ -244,6 +247,9 @@ function SlotView({
   pausedAt: number | null;
   isTimePaused: boolean;
   canExploreLocation: boolean;
+  availableMaps: MapId[];
+  currentMapId: MapId;
+  onTravelToMap: (mapId: MapId) => void;
   titleId?: string;
   descriptionId?: string;
   displayContext?: 'panel' | 'modal';
@@ -377,6 +383,34 @@ function SlotView({
       ? `Exploration underway within ${slot.name}.`
       : null;
   const shouldShowPrimaryAction = Boolean(actionLabel && canActivateSlot);
+
+  const travelTargetMapId = useMemo(() => {
+    if (!slot.location) {
+      return null;
+    }
+    const candidate =
+      MAP_SEQUENCE.find((mapId) => {
+        if (mapId === 'overworld') {
+          return false;
+        }
+        if (mapId === currentMapId) {
+          return false;
+        }
+        const definition = MAP_DEFINITIONS[mapId];
+        return definition.focusLocations.includes(slot.location);
+      }) ?? null;
+    if (!candidate) {
+      return null;
+    }
+    return availableMaps.includes(candidate) ? candidate : null;
+  }, [availableMaps, currentMapId, slot.location]);
+  const travelTargetDefinition = travelTargetMapId
+    ? MAP_DEFINITIONS[travelTargetMapId]
+    : null;
+  const travelButtonLabel = travelTargetDefinition
+    ? `Visit ${travelTargetDefinition.name}`
+    : null;
+  const travelButtonVariant = shouldShowPrimaryAction ? 'secondary' : 'primary';
 
   function acceptsCard(event: DragEvent<HTMLElement>) {
     return event.dataTransfer?.types.includes(CARD_DRAG_TYPE) ?? false;
@@ -662,6 +696,15 @@ function SlotView({
         </div>
       ) : null}
       <div className="slot-card__cta" role="group" aria-label={`${slot.name} actions`}>
+        {travelTargetMapId && travelButtonLabel ? (
+          <button
+            className={`slot-card__cta-button slot-card__cta-button--${travelButtonVariant}`}
+            type="button"
+            onClick={() => onTravelToMap(travelTargetMapId)}
+          >
+            {travelButtonLabel}
+          </button>
+        ) : null}
         {shouldShowPrimaryAction && actionLabel ? (
           <button
             className="slot-card__cta-button slot-card__cta-button--primary"
@@ -1067,6 +1110,7 @@ export default function App() {
 
   function handleMapChange(mapId: MapId) {
     setActiveMapId(mapId);
+    setActiveSlotModalId(null);
   }
 
   function handleSlotClick(slotId: string) {
@@ -1183,6 +1227,9 @@ export default function App() {
         pausedAt={state.pausedAt}
         isTimePaused={isPaused}
         canExploreLocation={canExplore}
+        availableMaps={availableMaps}
+        currentMapId={activeMapId}
+        onTravelToMap={handleMapChange}
         titleId={options?.titleId}
         descriptionId={options?.descriptionId}
         displayContext={options?.displayContext ?? 'panel'}
