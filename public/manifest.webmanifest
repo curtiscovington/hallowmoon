@@ -7,7 +7,7 @@
   "background_color": "#0b0614",
   "theme_color": "#2d174d",
   "description": "Offline mythical training and battles.",
-  "version": "0.1.52",
+  "version": "0.1.53",
   "icons": [
     {
       "src": "icons/icon.svg",
