@@ -57,8 +57,21 @@ export function SlotRevealOverlay({ slot, onClose }: SlotRevealOverlayProps) {
   }, []);
 
   useEffect(() => {
+    closeCalledRef.current = false;
+    setStage((current) => (current === 'intro' ? current : 'intro'));
+
+    const cardElement = cardRef.current;
+    if (cardElement) {
+      cardElement.style.removeProperty('--slot-reveal-translate-x');
+      cardElement.style.removeProperty('--slot-reveal-translate-y');
+      cardElement.style.removeProperty('--slot-reveal-scale-x');
+      cardElement.style.removeProperty('--slot-reveal-scale-y');
+    }
+  }, [slot.id]);
+
+  useEffect(() => {
     acknowledgeButtonRef.current?.focus();
-  }, []);
+  }, [slot.id]);
 
   useEffect(() => {
     if (stage !== 'outro') {
