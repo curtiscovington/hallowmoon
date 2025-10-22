@@ -81,12 +81,8 @@ function initialState(): GameState {
   const whisper = instantiateCard(OPPORTUNITY_TEMPLATES[0]);
   const slots: Record<string, Slot> = {};
   const manorSlot = instantiateSlot(SLOT_TEMPLATES.manor);
-  const townSlot = instantiateSlot(SLOT_TEMPLATES.town);
-  const forestSlot = instantiateSlot(SLOT_TEMPLATES.forest);
 
   slots[manorSlot.id] = manorSlot;
-  slots[townSlot.id] = townSlot;
-  slots[forestSlot.id] = forestSlot;
 
   return {
     cycle: 1,
@@ -291,6 +287,7 @@ function completeLocationExploration(state: GameState, slotId: string, log: stri
 
   const remainingAfterReveal = missingKeys.length > 0 ? missingKeys.length - 1 : 0;
   const shouldRemoveSlot = Boolean(definition?.removeWhenComplete && missingKeys.length <= 1);
+  const willUnlockTown = Boolean(definition?.key === 'manor' && shouldRemoveSlot);
 
   if (shouldRemoveSlot) {
     delete updatedSlots[slotId];
@@ -301,6 +298,16 @@ function completeLocationExploration(state: GameState, slotId: string, log: stri
       pendingAction: null,
       lockedUntil: null
     };
+  }
+
+  let townUnlocked = false;
+  if (willUnlockTown) {
+    const hasTown = Object.values(updatedSlots).some((slotEntry) => slotEntry.key === SLOT_TEMPLATES.town.key);
+    if (!hasTown) {
+      const townSlot = instantiateSlot(SLOT_TEMPLATES.town);
+      updatedSlots[townSlot.id] = townSlot;
+      townUnlocked = true;
+    }
   }
 
   let updatedCards = state.cards;
@@ -335,6 +342,13 @@ function completeLocationExploration(state: GameState, slotId: string, log: stri
     nextLog = appendLog(log, `${explorerName} uncovers ${fragment} within ${currentSlot.name}.`);
   } else {
     nextLog = appendLog(log, `${explorerName} reports no new findings in ${currentSlot.name}.`);
+  }
+
+  if (townUnlocked) {
+    nextLog = appendLog(
+      nextLog,
+      `${explorerName} charts the manor completely, revealing a clear path down to the town at the bottom of the hill.`
+    );
   }
 
   return {
