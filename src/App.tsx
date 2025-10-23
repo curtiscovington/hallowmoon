@@ -280,11 +280,29 @@ function SlotView({
   const lockRemainingMs = slot.lockedUntil
     ? Math.max(0, slot.lockedUntil - now + pausedElapsedMs)
     : 0;
+  const lockTotalMs = slot.lockDurationMs ?? null;
   const displayLockRemainingMs = Math.max(0, Math.round(lockRemainingMs * timing.timeScale));
   const isSlotLocked = Boolean(slot.lockedUntil && lockRemainingMs > 0);
   const isSlotInteractive = slot.unlocked && !isSlotLocked;
   const upgradeDisabled =
     !isSlotInteractive || slot.state === 'damaged' || slot.upgradeCost === 0;
+  const showDropzoneTimer = isSlotLocked && lockRemainingMs > 0;
+  const lockRemainingFraction =
+    showDropzoneTimer && lockTotalMs && lockTotalMs > 0
+      ? Math.min(1, Math.max(0, lockRemainingMs / lockTotalMs))
+      : null;
+  const dropzoneTimerAngle =
+    lockRemainingFraction !== null ? lockRemainingFraction * 360 : 360;
+  const dropzoneTimerProgress =
+    lockRemainingFraction !== null ? 1 - lockRemainingFraction : null;
+  const dropzoneTimerStyle = showDropzoneTimer
+    ? ({
+        '--slot-dropzone-timer-angle': `${dropzoneTimerAngle}deg`,
+        ...(dropzoneTimerProgress !== null
+          ? { '--slot-dropzone-timer-progress': dropzoneTimerProgress.toFixed(3) }
+          : {})
+      } as CSSProperties)
+    : undefined;
 
   useEffect(() => {
     if (!isSlotInteractive) {
@@ -618,9 +636,16 @@ function SlotView({
         aria-label={dropzoneLabel}
         aria-disabled={!isSlotInteractive}
         data-has-occupant={Boolean(occupant)}
+        style={dropzoneTimerStyle}
         onClick={handlePrimaryClick}
         onKeyDown={handlePrimaryKey}
       >
+        <span
+          className="slot-card__dropzone-timer"
+          data-active={showDropzoneTimer ? 'true' : 'false'}
+          data-paused={isTimePaused ? 'true' : 'false'}
+          aria-hidden="true"
+        />
         {stackDescription ? <span className="sr-only">{stackDescription}</span> : null}
         {occupant ? (
           <div className={`slot-card__stack${attachments.length > 0 ? ' slot-card__stack--layered' : ''}`}>
