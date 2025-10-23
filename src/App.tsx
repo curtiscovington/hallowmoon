@@ -961,22 +961,27 @@ export default function App() {
   );
 
   const slotSummaries = useMemo<Record<string, SlotSummary>>(
-    () =>
-      buildSlotSummaries({
+    () => {
+      void timeToNextCycle;
+      const summaryTimestamp = Date.now();
+      return buildSlotSummaries({
         slots,
         cards: state.cards,
         heroCardId: state.heroCardId,
         resources: state.resources,
         pausedAt: state.pausedAt,
-        locationAvailability: locationExplorationAvailability
-      }),
+        locationAvailability: locationExplorationAvailability,
+        now: summaryTimestamp
+      });
+    },
     [
       slots,
       state.cards,
       state.heroCardId,
       state.resources,
       state.pausedAt,
-      locationExplorationAvailability
+      locationExplorationAvailability,
+      timeToNextCycle
     ]
   );
 
