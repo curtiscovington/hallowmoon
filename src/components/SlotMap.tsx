@@ -259,20 +259,18 @@ export function SlotMap({
         showTimer && lockTotalMs && lockTotalMs > 0
           ? Math.min(1, Math.max(0, lockRemainingMs / lockTotalMs))
           : null;
-      const timerAngle = showTimer
-        ? remainingFraction !== null
-          ? remainingFraction * 360
-          : 360
-        : 0;
       const timerProgress =
         showTimer && remainingFraction !== null ? 1 - remainingFraction : showTimer ? 0 : null;
+      const timerProgressAngle =
+        showTimer && timerProgress !== null ? timerProgress * 360 : showTimer ? 0 : null;
       const timerStyle = showTimer
         ? ({
-            '--slot-timer-angle': `${timerAngle}deg`,
-            ...(timerProgress !== null ? { '--slot-timer-progress': timerProgress.toFixed(3) } : {})
+            ...(timerProgress !== null ? { '--slot-timer-progress': timerProgress.toFixed(3) } : {}),
+            ...(timerProgressAngle !== null
+              ? { '--slot-timer-progress-angle': `${timerProgressAngle}deg` }
+              : {})
           } satisfies CSSProperties)
         : undefined;
-      const timerLabel = showTimer ? `≈ ${formatDurationLabel(lockRemainingMs)}` : null;
       const markerClass = [
         'slot-map__marker',
         isSelected ? 'slot-map__marker--selected' : '',
@@ -391,11 +389,11 @@ export function SlotMap({
               <span className="slot-map__marker-emblem-icon">{markerGlyph}</span>
             </span>
           </button>
-          {showTimer && timerLabel ? (
-            <span className="slot-map__marker-timer-label" aria-hidden="true">
-              {timerLabel}
+          {slot.name && (
+            <span className="slot-map__marker-label" aria-hidden="true">
+              <span className="slot-map__marker-label-name">{slot.name}</span>
             </span>
-          ) : null}
+          )}
           {canTravelToTarget && travelTargetMapId && travelLabel ? (
             <button
               type="button"
@@ -426,9 +424,6 @@ export function SlotMap({
               {actionLabel}
             </button>
           ) : null}
-          <span className="slot-map__marker-label" aria-hidden="true">
-            {slot.name}
-          </span>
         </div>
       );
     });
