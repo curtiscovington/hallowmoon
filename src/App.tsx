@@ -289,20 +289,28 @@ function SlotView({
   const isSlotInteractive = slot.unlocked && !isSlotLocked;
   const upgradeDisabled =
     !isSlotInteractive || slot.state === 'damaged' || slot.upgradeCost === 0;
-  const showDropzoneTimer = isSlotLocked && lockRemainingMs > 0;
+  const showLockTimer = isSlotLocked && lockRemainingMs > 0;
   const lockRemainingFraction =
-    showDropzoneTimer && lockTotalMs && lockTotalMs > 0
+    showLockTimer && lockTotalMs && lockTotalMs > 0
       ? Math.min(1, Math.max(0, lockRemainingMs / lockTotalMs))
       : null;
   const dropzoneTimerAngle =
     lockRemainingFraction !== null ? lockRemainingFraction * 360 : 360;
   const dropzoneTimerProgress =
     lockRemainingFraction !== null ? 1 - lockRemainingFraction : null;
-  const dropzoneTimerStyle = showDropzoneTimer
+  const dropzoneTimerStyle = showLockTimer
     ? ({
         '--slot-dropzone-timer-angle': `${dropzoneTimerAngle}deg`,
         ...(dropzoneTimerProgress !== null
           ? { '--slot-dropzone-timer-progress': dropzoneTimerProgress.toFixed(3) }
+          : {})
+      } as CSSProperties)
+    : undefined;
+  const cardLockTimerStyle = showLockTimer
+    ? ({
+        '--slot-card-timer-angle': `${dropzoneTimerAngle}deg`,
+        ...(dropzoneTimerProgress !== null
+          ? { '--slot-card-timer-progress': dropzoneTimerProgress.toFixed(3) }
           : {})
       } as CSSProperties)
     : undefined;
@@ -597,6 +605,15 @@ function SlotView({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      <div
+        className="slot-card__lock-overlay"
+        data-active={showLockTimer ? 'true' : 'false'}
+        data-paused={isTimePaused ? 'true' : 'false'}
+        style={cardLockTimerStyle}
+        aria-hidden="true"
+      >
+        <span className="slot-card__lock-overlay-message">{timerMessage}</span>
+      </div>
       <header className="slot-card__header">
         <div className="slot-card__title-block">
           <span className="slot-card__type" aria-label={`${slotTypeInfo.label} slot`}>
@@ -645,7 +662,7 @@ function SlotView({
       >
         <span
           className="slot-card__dropzone-timer"
-          data-active={showDropzoneTimer ? 'true' : 'false'}
+          data-active={showLockTimer ? 'true' : 'false'}
           data-paused={isTimePaused ? 'true' : 'false'}
           aria-hidden="true"
         />

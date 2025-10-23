@@ -292,6 +292,18 @@ body {
   opacity: 1;
 }
 
+.slot-map__marker-timer-label {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  color: #fbe0a8;
+  text-shadow: 0 6px 14px rgba(10, 6, 22, 0.7);
+  pointer-events: none;
+}
+
 .slot-map__marker-emblem {
   position: relative;
   z-index: 2;
@@ -498,6 +510,85 @@ body {
 .slot-card--active {
   border-color: rgba(204, 189, 255, 0.75);
   box-shadow: 0 0 0 3px rgba(204, 189, 255, 0.35);
+}
+
+.slot-card__lock-overlay {
+  position: absolute;
+  inset: 0.35rem;
+  border-radius: calc(1.15rem - 0.35rem);
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  z-index: 6;
+}
+
+.slot-card__lock-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(18, 12, 36, 0.82), rgba(10, 6, 24, 0.92));
+  box-shadow: inset 0 0 32px rgba(6, 4, 16, 0.6);
+  opacity: calc(0.72 - 0.4 * var(--slot-card-timer-progress, 0));
+  transition: opacity 200ms ease, background 200ms ease;
+}
+
+.slot-card__lock-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(
+      from -90deg,
+      rgba(246, 194, 139, 0.58) 0deg,
+      rgba(246, 194, 139, 0.58) var(--slot-card-timer-angle, 0deg),
+      rgba(246, 194, 139, 0) var(--slot-card-timer-angle, 0deg),
+      rgba(246, 194, 139, 0) 360deg
+    );
+  mask: radial-gradient(circle at 50% 50%, transparent calc(100% - 0.6rem), black calc(100% - 0.45rem));
+  transition: background 200ms linear;
+}
+
+.slot-card__lock-overlay[data-active='true'] {
+  opacity: 1;
+}
+
+.slot-card__lock-overlay[data-paused='true']::before {
+  background: linear-gradient(180deg, rgba(52, 36, 98, 0.78), rgba(26, 18, 52, 0.9));
+}
+
+.slot-card__lock-overlay[data-paused='true']::after {
+  background: conic-gradient(
+      from -90deg,
+      rgba(187, 175, 246, 0.6) 0deg,
+      rgba(187, 175, 246, 0.6) var(--slot-card-timer-angle, 0deg),
+      rgba(187, 175, 246, 0) var(--slot-card-timer-angle, 0deg),
+      rgba(187, 175, 246, 0) 360deg
+    );
+}
+
+.slot-card__lock-overlay-message {
+  position: relative;
+  z-index: 1;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  background: rgba(18, 12, 36, 0.9);
+  border: 1px solid rgba(246, 194, 139, 0.45);
+  box-shadow: 0 12px 28px rgba(8, 4, 18, 0.6);
+  color: #fbe0a8;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.slot-card__lock-overlay[data-paused='true'] .slot-card__lock-overlay-message {
+  border-color: rgba(187, 175, 246, 0.45);
+  color: #d7d0ff;
 }
 
 .slot-card__header {
