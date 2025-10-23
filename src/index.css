@@ -294,11 +294,47 @@ body {
     transparent calc(100% - 0.26rem),
     rgba(0, 0, 0, 0.92) calc(100% - 0.18rem)
   );
+  transform-origin: 50% 50%;
   transition: background 200ms linear;
 }
 
 .slot-map__marker-timer[data-active='true'] {
   opacity: 1;
+}
+
+.slot-map__marker-timer[data-state='resolving']::before {
+  opacity: 0.45;
+}
+
+.slot-map__marker-timer[data-state='resolving']::after {
+  background: conic-gradient(
+    from -90deg,
+    rgba(247, 211, 150, 0) 0deg,
+    rgba(247, 211, 150, 0.92) 120deg,
+    rgba(86, 58, 140, 0.4) 220deg,
+    rgba(247, 211, 150, 0) 360deg
+  );
+  animation: slot-map-timer-spin 0.9s linear infinite;
+  transition: none;
+}
+
+.slot-map__marker-timer[data-state='resolving']::before {
+  transition: opacity 200ms ease;
+}
+
+@keyframes slot-map-timer-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-map__marker-timer[data-state='resolving']::after {
+    animation: none;
+  }
 }
 
 .slot-map__marker-emblem {

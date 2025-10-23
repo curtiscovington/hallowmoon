@@ -255,22 +255,28 @@ export function SlotMap({
       const lockRemainingMs = summary?.lockRemainingMs ?? 0;
       const lockTotalMs = summary?.lockTotalMs ?? null;
       const showTimer = Boolean(summary?.isLocked && lockRemainingMs > 0);
-      const remainingFraction =
-        showTimer && lockTotalMs && lockTotalMs > 0
-          ? Math.min(1, Math.max(0, lockRemainingMs / lockTotalMs))
-          : null;
-      const timerProgress =
-        showTimer && remainingFraction !== null ? 1 - remainingFraction : showTimer ? 0 : null;
-      const timerProgressAngle =
-        showTimer && timerProgress !== null ? timerProgress * 360 : showTimer ? 0 : null;
-      const timerStyle = showTimer
-        ? ({
-            ...(timerProgress !== null ? { '--slot-timer-progress': timerProgress.toFixed(3) } : {}),
-            ...(timerProgressAngle !== null
-              ? { '--slot-timer-progress-angle': `${timerProgressAngle}deg` }
-              : {})
-          } satisfies CSSProperties)
-        : undefined;
+      const canComputeTimerProgress = Boolean(
+        showTimer && typeof lockTotalMs === 'number' && lockTotalMs > 0
+      );
+      const remainingFraction = canComputeTimerProgress
+        ? Math.min(1, Math.max(0, lockRemainingMs / lockTotalMs))
+        : null;
+      const timerProgress = remainingFraction !== null ? 1 - remainingFraction : null;
+      const timerProgressAngle = timerProgress !== null ? timerProgress * 360 : null;
+      const timerState = showTimer
+        ? canComputeTimerProgress
+          ? 'countdown'
+          : 'resolving'
+        : resolving
+        ? 'resolving'
+        : null;
+      const timerStyle =
+        timerState === 'countdown' && timerProgress !== null && timerProgressAngle !== null
+          ? ({
+              '--slot-timer-progress': timerProgress.toFixed(3),
+              '--slot-timer-progress-angle': `${timerProgressAngle}deg`
+            } satisfies CSSProperties)
+          : undefined;
       const markerClass = [
         'slot-map__marker',
         isSelected ? 'slot-map__marker--selected' : '',
@@ -371,11 +377,12 @@ export function SlotMap({
             aria-label={`${slot.name} — ${statusParts.join(', ')}`}
           >
             <span className="slot-map__marker-outline" aria-hidden="true" />
-            {showTimer ? (
+            {timerState ? (
               <span
                 className="slot-map__marker-timer"
                 aria-hidden="true"
                 data-active="true"
+                data-state={timerState}
                 style={timerStyle}
               />
             ) : null}
