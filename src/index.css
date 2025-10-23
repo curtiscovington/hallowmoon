@@ -2279,3 +2279,49 @@ button {
   justify-content: center;
   pointer-events: auto;
 }
+
+.story-toast-layer {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + clamp(5.5rem, 16vw, 7.5rem));
+  transform: translateX(-50%);
+  width: min(90vw, 28rem);
+  pointer-events: none;
+  z-index: 240;
+}
+
+.story-toast {
+  background: linear-gradient(135deg, rgba(36, 28, 68, 0.94), rgba(20, 14, 38, 0.92));
+  border: 1px solid rgba(182, 162, 255, 0.45);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 18px 36px rgba(10, 6, 24, 0.55);
+  color: #f7f3ff;
+  font-size: 1rem;
+  line-height: 1.5;
+  text-align: center;
+  backdrop-filter: blur(18px);
+  animation: story-toast-enter 220ms ease;
+}
+
+.story-toast__message {
+  margin: 0;
+}
+
+@keyframes story-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-toast {
+    animation: none;
+  }
+}

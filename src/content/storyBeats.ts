@@ -16,6 +16,10 @@ const STORY_BEATS: Record<StoryBeatKey, StoryBeat> = {
   }
 };
 
+const STORY_BEAT_ENTRY_LOOKUP: Set<string> = new Set(
+  Object.values(STORY_BEATS).flatMap((beat) => beat.entries)
+);
+
 export function getStoryBeatEntries(key: StoryBeatKey): string[] {
   return STORY_BEATS[key].entries;
 }
@@ -23,4 +27,8 @@ export function getStoryBeatEntries(key: StoryBeatKey): string[] {
 export function buildStoryLog(keys: StoryBeatKey | StoryBeatKey[]): string[] {
   const beatKeys = Array.isArray(keys) ? keys : [keys];
   return beatKeys.flatMap((beatKey) => getStoryBeatEntries(beatKey));
+}
+
+export function isStoryBeatEntry(entry: string): boolean {
+  return STORY_BEAT_ENTRY_LOOKUP.has(entry);
 }

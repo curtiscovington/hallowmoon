@@ -29,6 +29,7 @@ import {
   buildSlotSummaries,
   type SlotSummary
 } from './state/selectors/slots';
+import { isStoryBeatEntry } from './content/storyBeats';
 
 const CARD_DRAG_TYPE = 'application/x-hallowmoon-card';
 
@@ -36,6 +37,7 @@ const BASE_CYCLE_MS = 60000;
 const TIMER_RESOLUTION_MS = 200;
 const SPEED_OPTIONS = [1, 2, 3] as const;
 const MANOR_ROOT_SLOT_KEY = 'the-manor';
+const STORY_TOAST_DURATION_MS = 4200;
 
 type SpeedOption = (typeof SPEED_OPTIONS)[number];
 
@@ -849,10 +851,14 @@ export default function App() {
   const slotModalTitleId = useId();
   const slotModalDescriptionId = useId();
   const [slotRevealQueue, setSlotRevealQueue] = useState<string[]>([]);
+  const [storyBeatQueue, setStoryBeatQueue] = useState<string[]>([]);
+  const [activeStoryBeatToast, setActiveStoryBeatToast] = useState<string | null>(null);
   const previousSlotIdsRef = useRef<Set<string>>(new Set(Object.keys(state.slots)));
   const previousAvailableMapsRef = useRef<MapId[]>([]);
   const manualPauseRef = useRef(false);
   const autoPausedByRevealRef = useRef(false);
+  const storyBeatToastTimerRef = useRef<number | null>(null);
+  const previousLogRef = useRef<string[]>([]);
 
   const setPausedManual = (value: boolean) => {
     manualPauseRef.current = value;
@@ -897,6 +903,68 @@ export default function App() {
       setSlotRevealQueue((prev) => [...prev, ...newIds]);
     }
   }, [state.slots]);
+
+  useEffect(() => {
+    const previousLog = previousLogRef.current;
+    const currentLog = state.log;
+
+    if (
+      previousLog.length === currentLog.length &&
+      currentLog.every((entry, index) => entry === previousLog[index])
+    ) {
+      previousLogRef.current = currentLog;
+      return;
+    }
+
+    let newEntries: string[] = [];
+
+    if (previousLog.length === 0) {
+      newEntries = currentLog;
+    } else if (currentLog.length > 0) {
+      const anchorIndex = currentLog.indexOf(previousLog[0]);
+      if (anchorIndex > 0) {
+        newEntries = currentLog.slice(0, anchorIndex);
+      } else if (anchorIndex === -1) {
+        newEntries = currentLog;
+      }
+    }
+
+    if (newEntries.length > 0) {
+      const newStoryEntries = newEntries.filter((entry) => isStoryBeatEntry(entry));
+      if (newStoryEntries.length > 0) {
+        setStoryBeatQueue((queue) => [...queue, ...newStoryEntries]);
+      }
+    }
+
+    previousLogRef.current = currentLog;
+  }, [state.log]);
+
+  useEffect(() => {
+    if (activeStoryBeatToast || storyBeatQueue.length === 0) {
+      return;
+    }
+
+    setActiveStoryBeatToast(storyBeatQueue[0]);
+    setStoryBeatQueue((queue) => queue.slice(1));
+  }, [activeStoryBeatToast, storyBeatQueue]);
+
+  useEffect(() => {
+    if (!activeStoryBeatToast) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setActiveStoryBeatToast(null);
+    }, STORY_TOAST_DURATION_MS);
+    storyBeatToastTimerRef.current = timeoutId;
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (storyBeatToastTimerRef.current === timeoutId) {
+        storyBeatToastTimerRef.current = null;
+      }
+    };
+  }, [activeStoryBeatToast]);
 
   useEffect(() => {
     const pendingCardReveals = state.pendingReveals.length;
@@ -1400,6 +1468,13 @@ export default function App() {
             <div className="chronicle-drawer__content" aria-live="polite">
               {chronicleContent}
             </div>
+          </div>
+        </div>
+      ) : null}
+      {activeStoryBeatToast ? (
+        <div className="story-toast-layer">
+          <div className="story-toast" role="status" aria-live="polite">
+            <p className="story-toast__message">{activeStoryBeatToast}</p>
           </div>
         </div>
       ) : null}
