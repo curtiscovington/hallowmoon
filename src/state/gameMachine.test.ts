@@ -70,6 +70,7 @@ function buildSlotFromTemplate(templateKey: keyof typeof SLOT_TEMPLATES, id: str
       : null,
     repairStarted: false,
     lockedUntil: null,
+    lockDurationMs: null,
     pendingAction: null,
     attachedCardIds: []
   };
@@ -286,13 +287,14 @@ describe('time scale controls', () => {
     let state = machine.initialState();
 
     const studySlot = buildStudySlot('timing-slot');
-    const initialLock = now + 60000;
+    const initialDuration = 60000;
+    const initialLock = now + initialDuration;
 
     state = {
       ...state,
       slots: {
         ...state.slots,
-        [studySlot.id]: { ...studySlot, lockedUntil: initialLock }
+        [studySlot.id]: { ...studySlot, lockedUntil: initialLock, lockDurationMs: initialDuration }
       }
     };
 
@@ -305,7 +307,9 @@ describe('time scale controls', () => {
     state = machine.reducer(state, { type: 'SET_TIME_SCALE', scale: 1 });
     expect(state.pausedAt).toBeNull();
     expect(state.timeScale).toBe(1);
-    expect(state.slots[studySlot.id]?.lockedUntil).toBe(initialLock + 5000);
+    const resumedSlot = state.slots[studySlot.id];
+    expect(resumedSlot?.lockedUntil).toBe(initialLock + 5000);
+    expect(resumedSlot?.lockDurationMs).toBe(initialDuration);
   });
 
   it('rescales remaining lock duration when resuming at a new speed', () => {
@@ -314,13 +318,14 @@ describe('time scale controls', () => {
     let state = machine.initialState();
 
     const studySlot = buildStudySlot('timing-slot-fast');
-    const initialLock = now + 60000;
+    const initialDuration = 60000;
+    const initialLock = now + initialDuration;
 
     state = {
       ...state,
       slots: {
         ...state.slots,
-        [studySlot.id]: { ...studySlot, lockedUntil: initialLock }
+        [studySlot.id]: { ...studySlot, lockedUntil: initialLock, lockDurationMs: initialDuration }
       }
     };
 
@@ -332,6 +337,7 @@ describe('time scale controls', () => {
     expect(state.timeScale).toBe(2);
     const resumedSlot = state.slots[studySlot.id];
     expect(resumedSlot?.lockedUntil).toBe(37000);
+    expect(resumedSlot?.lockDurationMs).toBe(30000);
   });
 });
 
@@ -381,6 +387,7 @@ describe('slot behavior registry', () => {
 
     const updatedSlot = state.slots[workSlot.id];
     expect(updatedSlot.lockedUntil).toBe(5000);
+    expect(updatedSlot.lockDurationMs).toBe(5000);
     expect(state.log.some((entry) => entry.includes('Mock behavior activates'))).toBe(true);
   });
 
@@ -416,6 +423,7 @@ describe('slot behavior registry', () => {
     }
 
     expect(state.slots[workSlot.id].lockedUntil).toBeNull();
+    expect(state.slots[workSlot.id].lockDurationMs).toBeNull();
     expect(state.log.some((entry) => entry.includes('No behavior is defined'))).toBe(true);
   });
 });

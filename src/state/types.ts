@@ -90,6 +90,7 @@ export interface Slot {
   repair: SlotRepair | null;
   repairStarted: boolean;
   lockedUntil: number | null;
+  lockDurationMs: number | null;
   pendingAction: PendingSlotAction | null;
   attachedCardIds: string[];
 }

@@ -1,5 +1,6 @@
 import {
   PointerEvent,
+  type CSSProperties,
   type DragEvent,
   useCallback,
   useEffect,
@@ -16,6 +17,7 @@ import {
 } from '../constants/mapDefinitions';
 import type { CardInstance, Slot } from '../state/types';
 import { describeCardForStatus } from '../utils/slotActions';
+import { formatDurationLabel } from '../utils/time';
 
 type MarkerPlaceholderState = 'locked' | 'busy' | 'open';
 
@@ -45,6 +47,8 @@ export interface SlotMapSlotSummary {
   actionLabel: string | null;
   canActivate: boolean;
   availabilityNote: string | null;
+  lockRemainingMs: number;
+  lockTotalMs: number | null;
 }
 
 interface SlotMapProps {
@@ -262,6 +266,26 @@ export function SlotMap({
       const markerGlyph = previewCard
         ? CARD_TYPE_GLYPHS[previewCard.type] ?? DEFAULT_GLYPH
         : PLACEHOLDER_GLYPHS[placeholderState] ?? DEFAULT_GLYPH;
+      const lockRemainingMs = summary?.lockRemainingMs ?? 0;
+      const lockTotalMs = summary?.lockTotalMs ?? null;
+      const showTimer = Boolean(summary?.isLocked && lockRemainingMs > 0);
+      const remainingFraction =
+        showTimer && lockTotalMs && lockTotalMs > 0
+          ? Math.min(1, Math.max(0, lockRemainingMs / lockTotalMs))
+          : null;
+      const timerAngle = showTimer
+        ? remainingFraction !== null
+          ? remainingFraction * 360
+          : 360
+        : 0;
+      const timerProgress =
+        showTimer && remainingFraction !== null ? 1 - remainingFraction : showTimer ? 0 : null;
+      const timerStyle = showTimer
+        ? ({
+            '--slot-timer-angle': `${timerAngle}deg`,
+            ...(timerProgress !== null ? { '--slot-timer-progress': timerProgress.toFixed(3) } : {})
+          } satisfies CSSProperties)
+        : undefined;
       const markerClass = [
         'slot-map__marker',
         isSelected ? 'slot-map__marker--selected' : '',
@@ -291,6 +315,9 @@ export function SlotMap({
       }
       if (damaged) {
         statusParts.push('Damaged');
+      }
+      if (summary?.isLocked && lockRemainingMs > 0) {
+        statusParts.push(`≈ ${formatDurationLabel(lockRemainingMs)} remain`);
       }
       if (summary?.availabilityNote) {
         statusParts.push(summary.availabilityNote);
@@ -359,6 +386,14 @@ export function SlotMap({
             aria-label={`${slot.name} — ${statusParts.join(', ')}`}
           >
             <span className="slot-map__marker-outline" aria-hidden="true" />
+            {showTimer ? (
+              <span
+                className="slot-map__marker-timer"
+                aria-hidden="true"
+                data-active="true"
+                style={timerStyle}
+              />
+            ) : null}
             <span
               className="slot-map__marker-emblem"
               data-card-type={previewCard ? previewCard.type : undefined}

@@ -63,6 +63,7 @@ function instantiateSlot(template: SlotTemplate, id?: string): Slot {
     repair,
     repairStarted: false,
     lockedUntil: null,
+    lockDurationMs: null,
     pendingAction: null,
     attachedCardIds: []
   };
@@ -299,7 +300,8 @@ function completeLocationExploration(state: GameState, slotId: string, log: stri
       ...currentSlot,
       occupantId: null,
       pendingAction: null,
-      lockedUntil: null
+      lockedUntil: null,
+      lockDurationMs: null
     };
   }
 
@@ -420,6 +422,7 @@ function resolvePendingSlotActions(state: GameState, now: number): GameState {
         const clearedSlot: Slot = {
           ...slot,
           lockedUntil: null,
+          lockDurationMs: null,
           pendingAction: null
         };
 
@@ -500,7 +503,8 @@ function activateSlot(state: GameState, slotId: string): SlotActionResult {
   const lockDuration = getScaledSlotLockDurationMs(refreshedSlot, result.state.timeScale, result.state);
   const lockedSlot: Slot = {
     ...refreshedSlot,
-    lockedUntil: clockNow() + lockDuration
+    lockedUntil: clockNow() + lockDuration,
+    lockDurationMs: lockDuration
   };
 
   const updatedSlots = {
@@ -1048,12 +1052,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
         for (const [slotId, slot] of Object.entries(adjustedSlots)) {
           if (slot.lockedUntil && slot.lockedUntil > now) {
-            const remaining = slot.lockedUntil - now;
+            const remaining = Math.max(0, slot.lockedUntil - now);
             const baseRemaining = Math.round(remaining * previousScale);
             const scaledRemaining = Math.max(0, Math.round(baseRemaining / nextScale));
+            const previousTotal = slot.lockDurationMs ?? Math.max(remaining, baseRemaining);
+            const elapsed = Math.max(0, previousTotal - remaining);
+            const nextTotal =
+              scaledRemaining > 0
+                ? Math.max(elapsed + scaledRemaining, scaledRemaining)
+                : Math.max(elapsed, previousTotal);
             scaledSlots[slotId] = {
               ...slot,
-              lockedUntil: scaledRemaining > 0 ? now + scaledRemaining : now
+              lockedUntil: scaledRemaining > 0 ? now + scaledRemaining : now,
+              lockDurationMs: nextTotal
             };
           } else {
             scaledSlots[slotId] = slot;
