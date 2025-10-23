@@ -272,6 +272,7 @@ export function SlotMap({
             ...(timerProgress !== null ? { '--slot-timer-progress': timerProgress.toFixed(3) } : {})
           } satisfies CSSProperties)
         : undefined;
+      const timerLabel = showTimer ? `≈ ${formatDurationLabel(lockRemainingMs)}` : null;
       const markerClass = [
         'slot-map__marker',
         isSelected ? 'slot-map__marker--selected' : '',
@@ -390,6 +391,11 @@ export function SlotMap({
               <span className="slot-map__marker-emblem-icon">{markerGlyph}</span>
             </span>
           </button>
+          {showTimer && timerLabel ? (
+            <span className="slot-map__marker-timer-label" aria-hidden="true">
+              {timerLabel}
+            </span>
+          ) : null}
           {canTravelToTarget && travelTargetMapId && travelLabel ? (
             <button
               type="button"
