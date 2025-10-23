@@ -958,6 +958,7 @@ export default function App() {
       const lockRemainingMs = slot.lockedUntil
         ? Math.max(0, slot.lockedUntil - now + pausedElapsedMs)
         : 0;
+      const lockTotalMs = slot.lockDurationMs ?? null;
       const isLocked = Boolean(slot.lockedUntil && lockRemainingMs > 0);
       const isSlotInteractive = slot.unlocked && !isLocked;
       const actionMetadata = getSlotActionMetadata({
@@ -980,7 +981,9 @@ export default function App() {
         isLocked,
         actionLabel: actionMetadata.actionLabel,
         canActivate: actionMetadata.canActivate,
-        availabilityNote: actionMetadata.availabilityNote
+        availabilityNote: actionMetadata.availabilityNote,
+        lockRemainingMs,
+        lockTotalMs
       } satisfies SlotMapSlotSummary;
     }
 
