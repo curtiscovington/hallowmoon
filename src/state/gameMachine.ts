@@ -193,6 +193,11 @@ function spawnOpportunity(state: GameState, log: string[]): {
 } {
   const template = randomFrom(OPPORTUNITY_TEMPLATES);
   const card = instantiateCard(template);
+  const shouldLogAppearance = !template.traits.includes('fleeting');
+
+  const nextLog = shouldLogAppearance
+    ? appendLog(log, `${card.name} drifts within reach, inviting attention.`)
+    : log;
 
   const nextState: GameState = {
     ...state,
@@ -200,10 +205,9 @@ function spawnOpportunity(state: GameState, log: string[]): {
       ...state.cards,
       [card.id]: card
     },
-    hand: addToHand(state.hand, card.id, false)
+    hand: addToHand(state.hand, card.id, false),
+    log: nextLog
   };
-
-  const nextLog = appendLog(log, `${card.name} drifts within reach, inviting attention.`);
 
   return { state: nextState, log: nextLog };
 }
@@ -897,11 +901,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         }
         delete updatedCards[card.id];
         updatedPendingReveals = updatedPendingReveals.filter((id) => id !== card.id);
-        const expireMessage =
-          expireAbility === 'expire:fading'
-            ? `${card.name} fades before it can be used.`
-            : `${card.name} fades before it can be used.`;
-        updatedLog = appendLog(updatedLog, expireMessage);
+        if (!card.traits.includes('fleeting')) {
+          const expireMessage =
+            expireAbility === 'expire:fading'
+              ? `${card.name} fades before it can be used.`
+              : `${card.name} fades before it can be used.`;
+          updatedLog = appendLog(updatedLog, expireMessage);
+        }
         } else {
           updatedCards = {
             ...updatedCards,
