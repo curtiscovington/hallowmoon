@@ -16,6 +16,7 @@ import {
   findAnchorForSlot
 } from '../constants/mapDefinitions';
 import type { CardInstance, Slot } from '../state/types';
+import type { SlotSummary } from '../state/selectors/slots';
 import { describeCardForStatus } from '../utils/slotActions';
 import { formatDurationLabel } from '../utils/time';
 
@@ -36,27 +37,12 @@ const PLACEHOLDER_GLYPHS: Record<MarkerPlaceholderState, string> = {
 
 const DEFAULT_GLYPH = '✦';
 
-export interface SlotMapSlotSummary {
-  occupant: CardInstance | null;
-  assistant: CardInstance | null;
-  attachments: CardInstance[];
-  isHeroInSlot: boolean;
-  canExploreLocation: boolean;
-  isSlotInteractive: boolean;
-  isLocked: boolean;
-  actionLabel: string | null;
-  canActivate: boolean;
-  availabilityNote: string | null;
-  lockRemainingMs: number;
-  lockTotalMs: number | null;
-}
-
 interface SlotMapProps {
   mapId: MapId;
   onMapChange: (mapId: MapId) => void;
   availableMaps: MapId[];
   slots: Slot[];
-  slotSummaries: Record<string, SlotMapSlotSummary>;
+  slotSummaries: Record<string, SlotSummary>;
   selectedSlotId: string | null;
   onFocusSlot: (slotId: string) => void;
   onOpenSlotDetails: (slotId: string) => void;
@@ -68,7 +54,7 @@ interface SlotMapProps {
 interface MarkerData {
   slot: Slot;
   anchor: MapSlotAnchor;
-  summary: SlotMapSlotSummary | null;
+  summary: SlotSummary | null;
   locked: boolean;
   damaged: boolean;
   resolving: boolean;
@@ -127,7 +113,7 @@ export function SlotMap({
   }, [map, slotSummaries, slots]);
 
   const canDropOnSlot = useCallback(
-    (slot: Slot, summary: SlotMapSlotSummary | null) => {
+    (slot: Slot, summary: SlotSummary | null) => {
       if (!summary) {
         return false;
       }

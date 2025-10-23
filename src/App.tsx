@@ -10,15 +10,13 @@ import {
   useState
 } from 'react';
 import { useGame } from './state/GameContext';
-import { CardInstance, LocationTag, Resources, Slot } from './state/types';
+import { CardInstance, Resources, Slot } from './state/types';
 import { SLOT_TYPE_INFO } from './constants/slotTypeInfo';
 import { SlotRevealOverlay } from './components/SlotRevealOverlay';
 import { CardRevealOverlay } from './components/CardRevealOverlay';
-import { SlotMap, type SlotMapSlotSummary } from './components/SlotMap';
+import { SlotMap } from './components/SlotMap';
 import { SlotDetailsOverlay } from './components/SlotDetailsOverlay';
 import { formatDuration } from './utils/time';
-import { SLOT_TEMPLATES } from './state/content';
-import { LOCATION_DEFINITIONS } from './state/slots/location';
 import {
   MAP_DEFINITIONS,
   MAP_SEQUENCE,
@@ -26,6 +24,11 @@ import {
   findAnchorForSlot
 } from './constants/mapDefinitions';
 import { getSlotActionMetadata } from './utils/slotActions';
+import {
+  buildLocationExplorationAvailability,
+  buildSlotSummaries,
+  type SlotSummary
+} from './state/selectors/slots';
 
 const CARD_DRAG_TYPE = 'application/x-hallowmoon-card';
 
@@ -932,95 +935,30 @@ export default function App() {
 
   const slots = useMemo(() => Object.values(state.slots), [state.slots]);
 
-  const locationExplorationAvailability = useMemo(() => {
-    const availability: Partial<Record<LocationTag, boolean>> = {};
-    const existingKeys = new Set(slots.map((slotEntry) => slotEntry.key));
+  const locationExplorationAvailability = useMemo(
+    () => buildLocationExplorationAvailability(slots),
+    [slots]
+  );
 
-    Object.values(LOCATION_DEFINITIONS).forEach((definition) => {
-      const hasUndiscoveredSite = definition.discoverableTemplateKeys.some((templateKey) => {
-        const template = SLOT_TEMPLATES[templateKey];
-        if (!template) {
-          return false;
-        }
-        const restoredTemplate = template.repair ? SLOT_TEMPLATES[template.repair.targetKey] : null;
-        const restoredKey = restoredTemplate?.key ?? null;
-
-        if (existingKeys.has(template.key)) {
-          return false;
-        }
-        if (restoredKey && existingKeys.has(restoredKey)) {
-          return false;
-        }
-        return true;
-      });
-
-      availability[definition.key] = definition.allowExplorationWhenExhausted || hasUndiscoveredSite;
-    });
-
-    return availability;
-  }, [slots]);
-
-  const slotSummaries = useMemo<Record<string, SlotMapSlotSummary>>(() => {
-    const summaries: Record<string, SlotMapSlotSummary> = {};
-    const now = Date.now();
-    const pausedElapsedMs = state.pausedAt !== null ? Math.max(0, now - state.pausedAt) : 0;
-
-    for (const slot of slots) {
-      const occupant = slot.occupantId ? state.cards[slot.occupantId] ?? null : null;
-      const assistant = slot.assistantId ? state.cards[slot.assistantId] ?? null : null;
-      const attachments = slot.attachedCardIds
-        .map((cardId) => state.cards[cardId])
-        .filter((card): card is CardInstance => Boolean(card));
-      const isHeroInSlot = Boolean(
-        (occupant && occupant.id === state.heroCardId) || (assistant && assistant.id === state.heroCardId)
-      );
-      const canExplore =
-        slot.type === 'location' && slot.state !== 'damaged'
-          ? slot.location
-            ? locationExplorationAvailability[slot.location] ?? true
-            : true
-          : true;
-      const lockRemainingMs = slot.lockedUntil
-        ? Math.max(0, slot.lockedUntil - now + pausedElapsedMs)
-        : 0;
-      const lockTotalMs = slot.lockDurationMs ?? null;
-      const isLocked = Boolean(slot.lockedUntil && lockRemainingMs > 0);
-      const isSlotInteractive = slot.unlocked && !isLocked;
-      const actionMetadata = getSlotActionMetadata({
-        slot,
-        occupant,
-        assistant,
-        attachments,
+  const slotSummaries = useMemo<Record<string, SlotSummary>>(
+    () =>
+      buildSlotSummaries({
+        slots,
+        cards: state.cards,
+        heroCardId: state.heroCardId,
         resources: state.resources,
-        canExploreLocation: canExplore,
-        isSlotInteractive
-      });
-
-      summaries[slot.id] = {
-        occupant,
-        assistant,
-        attachments,
-        isHeroInSlot,
-        canExploreLocation: canExplore,
-        isSlotInteractive,
-        isLocked,
-        actionLabel: actionMetadata.actionLabel,
-        canActivate: actionMetadata.canActivate,
-        availabilityNote: actionMetadata.availabilityNote,
-        lockRemainingMs,
-        lockTotalMs
-      } satisfies SlotMapSlotSummary;
-    }
-
-    return summaries;
-  }, [
-    slots,
-    state.cards,
-    state.heroCardId,
-    state.resources,
-    state.pausedAt,
-    locationExplorationAvailability
-  ]);
+        pausedAt: state.pausedAt,
+        locationAvailability: locationExplorationAvailability
+      }),
+    [
+      slots,
+      state.cards,
+      state.heroCardId,
+      state.resources,
+      state.pausedAt,
+      locationExplorationAvailability
+    ]
+  );
 
   const slotsByMap = useMemo(() => {
     const mapping: Record<MapId, Slot[]> = {
