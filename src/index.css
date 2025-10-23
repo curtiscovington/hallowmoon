@@ -249,6 +249,7 @@ body {
   border-radius: 0.75rem;
   background: rgba(16, 10, 28, 0.45);
   box-shadow: 0 6px 16px rgba(10, 6, 26, 0.55);
+  z-index: 3;
 }
 
 .slot-map__marker-timer {
@@ -256,7 +257,7 @@ body {
   inset: 0.12rem;
   border-radius: 0.68rem;
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
   opacity: 0;
   overflow: hidden;
   transition: opacity 160ms ease;
@@ -339,7 +340,7 @@ body {
 
 .slot-map__marker-emblem {
   position: relative;
-  z-index: 2;
+  z-index: 1;
   display: grid;
   place-items: center;
   width: calc(100% - 0.3rem);
