@@ -469,7 +469,7 @@ function activateSlot(state: GameState, slotId: string): SlotActionResult {
   const now = clockNow();
   if (slot.lockedUntil && slot.lockedUntil > now) {
     const remaining = slot.lockedUntil - now;
-    const message = `${slot.name} is still resolving a previous action. ≈ ${formatDurationLabel(remaining)} remain.`;
+    const message = `${slot.name} is still completing a previous action. ≈ ${formatDurationLabel(remaining)} remain.`;
     return {
       state: preparedState,
       log: appendLog(preparedState.log, message),

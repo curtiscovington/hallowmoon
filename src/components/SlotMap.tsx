@@ -291,7 +291,7 @@ export function SlotMap({
       if (!slot.unlocked) {
         statusParts.push('Locked discovery');
       } else if (locked) {
-        statusParts.push('Resolving action');
+        statusParts.push('In progress');
       } else if (resolving) {
         statusParts.push('Exploration underway');
       } else if (occupant) {

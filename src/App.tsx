@@ -389,10 +389,15 @@ function SlotView({
   if (isTimePaused) {
     timerClasses.push('slot-card__timer--paused');
   }
+  const lockCountdownMessage =
+    displayLockRemainingMs > 0 ? `≈ ${formatDuration(displayLockRemainingMs)} remain` : 'In progress';
+  const lockStatusMessage = isTimePaused
+    ? displayLockRemainingMs > 0
+      ? `${lockCountdownMessage} · paused`
+      : 'Paused'
+    : lockCountdownMessage;
   const timerMessage = isSlotLocked
-    ? isTimePaused
-      ? 'Resolving · paused'
-      : `Resolving · ≈ ${formatDuration(displayLockRemainingMs)}`
+    ? lockStatusMessage
     : isTimePaused
     ? 'Time paused'
     : actionLabel ?? baseActionLabel;
@@ -716,7 +721,7 @@ function SlotView({
         ) : (
           <div className="slot-card__placeholder" aria-live="polite">
             <span className="slot-card__placeholder-title">
-              {slot.unlocked ? (isSlotLocked ? 'Resolving action' : 'Open for assignment') : 'Locked discovery'}
+              {slot.unlocked ? (isSlotLocked ? 'In progress' : 'Open for assignment') : 'Locked discovery'}
             </span>
             <span className="slot-card__placeholder-hint">Drop a compatible card here.</span>
           </div>
@@ -786,9 +791,7 @@ function SlotView({
             <span className="slot-card__note">Requires a discovery.</span>
           ) : null}
           {isSlotLocked && displayLockRemainingMs > 0 ? (
-            <span className="slot-card__note">
-              Resolving action · ≈ {formatDuration(displayLockRemainingMs)} remain
-            </span>
+            <span className="slot-card__note">{lockStatusMessage}</span>
           ) : null}
           {occupantExpiry ? (
             <span className="slot-card__note">
