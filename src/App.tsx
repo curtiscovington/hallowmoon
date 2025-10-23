@@ -35,6 +35,7 @@ const CARD_DRAG_TYPE = 'application/x-hallowmoon-card';
 const BASE_CYCLE_MS = 60000;
 const TIMER_RESOLUTION_MS = 200;
 const SPEED_OPTIONS = [1, 2, 3] as const;
+const MANOR_ROOT_SLOT_KEY = 'the-manor';
 
 type SpeedOption = (typeof SPEED_OPTIONS)[number];
 
@@ -1015,9 +1016,15 @@ export default function App() {
         return true;
       }
       const definition = MAP_DEFINITIONS[id];
-      return slots.some(
-        (slot) => slot.location && definition.focusLocations.includes(slot.location)
-      );
+      return slots.some((slot) => {
+        if (!slot.location || !definition.focusLocations.includes(slot.location)) {
+          return false;
+        }
+        if (id === 'manor') {
+          return slot.key !== MANOR_ROOT_SLOT_KEY;
+        }
+        return true;
+      });
     });
     if (!mapsWithSites.includes('overworld')) {
       mapsWithSites.unshift('overworld');
