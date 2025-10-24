@@ -12,15 +12,33 @@ export interface CardTemplate {
   ability?: CardAbilityMetadata;
 }
 
-export const HERO_TEMPLATE: CardTemplate = {
-  key: 'persona-initiate',
-  name: 'Initiate of the Veiled Star',
-  type: 'persona',
-  description:
-    'You. A fledgling adept weaving meaning from scraps of forgotten constellations.',
-  traits: ['permanent', 'persona'],
-  permanent: true
-};
+export const HERO_PERSONA_TEMPLATES: readonly CardTemplate[] = [
+  {
+    key: 'persona-watcher',
+    name: 'The Watcher',
+    type: 'persona',
+    description: '“You see what others overlook. The world speaks to those who listen.”',
+    traits: ['permanent', 'persona'],
+    permanent: true
+  },
+  {
+    key: 'persona-weaver',
+    name: 'The Weaver',
+    type: 'persona',
+    description: '“You shape connections unseen — threads of fate, thought, and will.”',
+    traits: ['permanent', 'persona'],
+    permanent: true
+  },
+  {
+    key: 'persona-outcast',
+    name: 'The Outcast',
+    type: 'persona',
+    description:
+      '“You walk apart, unbound by the threads that bind others. The world turned its back — so you learned to face it alone.”',
+    traits: ['permanent', 'persona'],
+    permanent: true
+  }
+];
 
 export const OPPORTUNITY_TEMPLATES: readonly CardTemplate[] = [
   {

@@ -54,7 +54,7 @@ export function buildLocationExplorationAvailability(slots: Slot[]): LocationExp
 interface BuildSlotSummariesOptions {
   slots: Slot[];
   cards: Record<string, CardInstance>;
-  heroCardId: string;
+  heroCardId: string | null;
   resources: Resources;
   pausedAt: number | null;
   locationAvailability: LocationExplorationAvailability;
@@ -81,7 +81,7 @@ export function buildSlotSummaries({
       .map((cardId) => cards[cardId])
       .filter((card): card is CardInstance => Boolean(card));
     const isHeroInSlot = Boolean(
-      (occupant && occupant.id === heroCardId) || (assistant && assistant.id === heroCardId)
+      heroCardId && ((occupant && occupant.id === heroCardId) || (assistant && assistant.id === heroCardId))
     );
 
     const canExplore =

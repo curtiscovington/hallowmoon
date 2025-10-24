@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { buildLocationExplorationAvailability, buildSlotSummaries } from './slots';
-import { SLOT_TEMPLATES, HERO_TEMPLATE, OPPORTUNITY_TEMPLATES } from '../content';
+import { SLOT_TEMPLATES, HERO_PERSONA_TEMPLATES, OPPORTUNITY_TEMPLATES } from '../content';
 import type { Slot } from '../types';
 import { createCardInstance } from '../content/cards';
+
+const HERO_TEMPLATE = HERO_PERSONA_TEMPLATES[0];
 
 function createSlotFromTemplate(
   templateKey: keyof typeof SLOT_TEMPLATES,

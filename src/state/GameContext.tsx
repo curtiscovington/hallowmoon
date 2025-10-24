@@ -22,6 +22,7 @@ interface GameContextValue {
   getUpgradeCost: (slotId: string) => number;
   setTimeScale: (scale: number) => void;
   acknowledgeCardReveal: (cardId: string) => void;
+  chooseHero: (templateKey: string) => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -66,6 +67,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const acknowledgeCardReveal = useCallback((cardId: string) => {
     dispatch({ type: 'ACKNOWLEDGE_CARD_REVEAL', cardId });
+  }, []);
+
+  const chooseHero = useCallback((templateKey: string) => {
+    dispatch({ type: 'CHOOSE_HERO', templateKey });
   }, []);
 
   const getUpgradeCost = useCallback(
@@ -118,7 +123,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       advanceTime,
       getUpgradeCost,
       setTimeScale,
-      acknowledgeCardReveal
+      acknowledgeCardReveal,
+      chooseHero
     }),
     [
       state,
@@ -129,7 +135,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       advanceTime,
       getUpgradeCost,
       setTimeScale,
-      acknowledgeCardReveal
+      acknowledgeCardReveal,
+      chooseHero
     ]
   );
 

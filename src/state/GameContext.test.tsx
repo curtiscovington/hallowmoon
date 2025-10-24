@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import { GameProvider, useGame } from './GameContext';
 import type { GameState } from './types';
+import { HERO_PERSONA_TEMPLATES } from './content';
 
 function getSlotByKey(state: GameState, key: string) {
   return Object.values(state.slots).find((slot) => slot.key === key);
@@ -26,7 +27,13 @@ describe('GameContext manor restoration', () => {
     const wrapper = ({ children }: { children: React.ReactNode }) => <GameProvider>{children}</GameProvider>;
     const { result } = renderHook(() => useGame(), { wrapper });
 
-    const heroId = result.current.state.heroCardId;
+    const personaKey = HERO_PERSONA_TEMPLATES[0].key;
+
+    act(() => {
+      result.current.chooseHero(personaKey);
+    });
+
+    const heroId = result.current.state.heroCardId!;
 
     const exploreManor = () => {
       const manorSlot = getSlotByKey(result.current.state, 'the-manor');
