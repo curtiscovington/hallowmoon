@@ -1028,11 +1028,6 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       nextState = resolvePendingSlotActions(nextState, now);
 
-      if (randomSource() < 0.65) {
-        const spawnResult = spawnOpportunity(nextState, nextState.log);
-        nextState = { ...spawnResult.state, log: spawnResult.log };
-      }
-
       return nextState;
     }
     case 'RESOLVE_PENDING_SLOT_ACTIONS': {

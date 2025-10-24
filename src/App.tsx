@@ -1107,10 +1107,6 @@ export default function App() {
     () => slots.find((slot) => slot.key === MANOR_ROOT_SLOT_KEY) ?? null,
     [slots]
   );
-  const fleetingCard = useMemo(
-    () => handCards.find((card) => !card.permanent && card.traits.includes('fleeting')) ?? null,
-    [handCards]
-  );
 
   const locationExplorationAvailability = useMemo(
     () => buildLocationExplorationAvailability(slots),
@@ -1538,7 +1534,6 @@ export default function App() {
           entries={arrivalStoryEntries}
           heroName={heroCard?.name ?? null}
           manorName={manorSlot?.name ?? null}
-          fleetingCardName={fleetingCard?.name ?? null}
           onClose={() => setIsIntroOpen(false)}
         />
       ) : null}
