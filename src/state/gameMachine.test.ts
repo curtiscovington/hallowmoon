@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGameMachine } from './gameMachine';
-import { SLOT_TEMPLATES } from './content';
+import { HERO_PERSONA_TEMPLATES, SLOT_TEMPLATES } from './content';
 import { SLOT_BEHAVIORS } from './slots/behaviors';
 import { createCardInstance, type CardTemplate } from './content/cards';
 import type { Slot } from './types';
@@ -16,13 +16,20 @@ describe('createGameMachine', () => {
 
     const state = machine.initialState();
 
-    const heroIdSuffix = (0.123456).toString(36).slice(2, 8);
-    expect(state.heroCardId).toBe(`persona-initiate-${heroIdSuffix}`);
-    expect(state.cards[state.heroCardId]?.name).toBe('Initiate of the Veiled Star');
+    expect(state.heroCardId).toBeNull();
 
-    const whisperId = state.hand.find((id) => id !== state.heroCardId);
-    const whisperSuffix = (0.654321).toString(36).slice(2, 8);
+    const whisperSuffix = (0.123456).toString(36).slice(2, 8);
+    const whisperId = state.hand[0];
     expect(whisperId).toBe(`fading-whisper-${whisperSuffix}`);
+
+    const personaKey = HERO_PERSONA_TEMPLATES[0].key;
+    const withHero = machine.reducer(state, { type: 'CHOOSE_HERO', templateKey: personaKey });
+
+    const heroIdSuffix = (0.654321).toString(36).slice(2, 8);
+    expect(withHero.heroCardId).toBe(`persona-watcher-${heroIdSuffix}`);
+    expect(withHero.cards[withHero.heroCardId!]?.name).toBe(HERO_PERSONA_TEMPLATES[0].name);
+    expect(withHero.hand[0]).toBe(withHero.heroCardId);
+    expect(withHero.log[0]).toContain('accepts the mantle');
 
     expect(machine.now()).toBe(42);
     now = 42000;
@@ -88,10 +95,14 @@ function createTestMachine() {
   });
 }
 
+const DEFAULT_PERSONA_KEY = HERO_PERSONA_TEMPLATES[0].key;
+
 describe('card ability behaviors', () => {
   it('applies study rewards through ability metadata', () => {
     const machine = createTestMachine();
     let state = machine.initialState();
+
+    state = machine.reducer(state, { type: 'CHOOSE_HERO', templateKey: DEFAULT_PERSONA_KEY });
 
     const studySlot = buildStudySlot('study-slot');
     state = {
@@ -126,6 +137,8 @@ describe('card ability behaviors', () => {
     const machine = createTestMachine();
     let state = machine.initialState();
 
+    state = machine.reducer(state, { type: 'CHOOSE_HERO', templateKey: DEFAULT_PERSONA_KEY });
+
     const studySlot = buildStudySlot('study-slot-persona');
     state = {
       ...state,
@@ -135,7 +148,7 @@ describe('card ability behaviors', () => {
       }
     };
 
-    const heroId = state.heroCardId;
+    const heroId = state.heroCardId!;
     state = machine.reducer(state, {
       type: 'MOVE_CARD_TO_SLOT',
       cardId: heroId,
@@ -158,6 +171,8 @@ describe('card ability behaviors', () => {
     const machine = createTestMachine();
     let state = machine.initialState();
 
+    state = machine.reducer(state, { type: 'CHOOSE_HERO', templateKey: DEFAULT_PERSONA_KEY });
+
     const studySlot = buildStudySlot('study-slot-dream');
     state = {
       ...state,
@@ -167,7 +182,7 @@ describe('card ability behaviors', () => {
       }
     };
 
-    const heroId = state.heroCardId;
+    const heroId = state.heroCardId!;
 
     const dreamTemplate = {
       key: 'test-dream',
@@ -346,6 +361,8 @@ describe('slot behavior registry', () => {
     const machine = createGameMachine({ clock: () => 0 });
     let state = machine.initialState();
 
+    state = machine.reducer(state, { type: 'CHOOSE_HERO', templateKey: DEFAULT_PERSONA_KEY });
+
     const workSlot = buildSlotFromTemplate('work', 'mock-work-slot');
     state = {
       ...state,
@@ -355,7 +372,7 @@ describe('slot behavior registry', () => {
       }
     };
 
-    const heroId = state.heroCardId;
+    const heroId = state.heroCardId!;
     state = machine.reducer(state, {
       type: 'MOVE_CARD_TO_SLOT',
       cardId: heroId,
@@ -395,6 +412,8 @@ describe('slot behavior registry', () => {
     const machine = createGameMachine({ clock: () => 0 });
     let state = machine.initialState();
 
+    state = machine.reducer(state, { type: 'CHOOSE_HERO', templateKey: DEFAULT_PERSONA_KEY });
+
     const workSlot = buildSlotFromTemplate('work', 'missing-behavior-slot');
     state = {
       ...state,
@@ -404,7 +423,7 @@ describe('slot behavior registry', () => {
       }
     };
 
-    const heroId = state.heroCardId;
+    const heroId = state.heroCardId!;
     state = machine.reducer(state, {
       type: 'MOVE_CARD_TO_SLOT',
       cardId: heroId,

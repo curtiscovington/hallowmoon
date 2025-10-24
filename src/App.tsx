@@ -18,6 +18,7 @@ import { CardRevealOverlay } from './components/CardRevealOverlay';
 import { SlotMap } from './components/SlotMap';
 import { SlotDetailsOverlay } from './components/SlotDetailsOverlay';
 import { IntroOverlay } from './components/IntroOverlay';
+import { PersonaSelectOverlay } from './components/PersonaSelectOverlay';
 import { formatDuration } from './utils/time';
 import {
   MAP_DEFINITIONS,
@@ -25,6 +26,7 @@ import {
   type MapId,
   findAnchorForSlot
 } from './constants/mapDefinitions';
+import { PERSONA_OPTIONS } from './constants/personaOptions';
 import { getSlotActionMetadata } from './utils/slotActions';
 import {
   buildLocationExplorationAvailability,
@@ -835,7 +837,8 @@ export default function App() {
     getUpgradeCost,
     recallCard,
     setTimeScale,
-    acknowledgeCardReveal
+    acknowledgeCardReveal,
+    chooseHero
   } = useGame();
   const isDesktop = useMediaQuery('(min-width: 900px)');
   const [isPaused, setIsPausedState] = useState(false);
@@ -851,7 +854,8 @@ export default function App() {
   const [isHandOpen, setIsHandOpen] = useState(isDesktop);
   const arrivalStoryEntries = useMemo(() => getStoryBeatEntries('arrival'), []);
   const arrivalStoryEntrySet = useMemo(() => new Set(arrivalStoryEntries), [arrivalStoryEntries]);
-  const [isIntroOpen, setIsIntroOpen] = useState(arrivalStoryEntries.length > 0);
+  const [isIntroOpen, setIsIntroOpen] = useState(false);
+  const [hasIntroBeenQueued, setHasIntroBeenQueued] = useState(false);
   const handPanelId = useId();
   const slotModalTitleId = useId();
   const slotModalDescriptionId = useId();
@@ -869,6 +873,8 @@ export default function App() {
     () => (state.heroCardId ? state.cards[state.heroCardId] ?? null : null),
     [state.cards, state.heroCardId]
   );
+  const hasSelectedPersona = Boolean(heroCard);
+  const isPersonaSelectionOpen = !hasSelectedPersona;
 
   const setPausedManual = useCallback(
     (value: boolean) => {
@@ -907,6 +913,23 @@ export default function App() {
   }, [isPaused, setTimeScale, speed]);
 
   useEffect(() => {
+    if (hasIntroBeenQueued) {
+      return;
+    }
+    if (!hasSelectedPersona) {
+      return;
+    }
+
+    if (arrivalStoryEntries.length === 0) {
+      setHasIntroBeenQueued(true);
+      return;
+    }
+
+    setIsIntroOpen(true);
+    setHasIntroBeenQueued(true);
+  }, [arrivalStoryEntries.length, hasIntroBeenQueued, hasSelectedPersona]);
+
+  useEffect(() => {
     if (!isIntroOpen) {
       introPauseAppliedRef.current = false;
       return;
@@ -917,6 +940,13 @@ export default function App() {
       setPausedManual(true);
     }
   }, [isIntroOpen, setPausedManual]);
+
+  useEffect(() => {
+    if (!isPersonaSelectionOpen) {
+      return;
+    }
+    setPausedManual(true);
+  }, [isPersonaSelectionOpen, setPausedManual]);
 
   useEffect(() => {
     const previousIds = previousSlotIdsRef.current;
@@ -968,13 +998,13 @@ export default function App() {
   }, [arrivalStoryEntrySet, isIntroOpen, state.log]);
 
   useEffect(() => {
-    if (isIntroOpen || activeStoryBeatToast || storyBeatQueue.length === 0) {
+    if (isIntroOpen || isPersonaSelectionOpen || activeStoryBeatToast || storyBeatQueue.length === 0) {
       return;
     }
 
     setActiveStoryBeatToast(storyBeatQueue[0]);
     setStoryBeatQueue((queue) => queue.slice(1));
-  }, [activeStoryBeatToast, isIntroOpen, storyBeatQueue]);
+  }, [activeStoryBeatToast, isIntroOpen, isPersonaSelectionOpen, storyBeatQueue]);
 
   useEffect(() => {
     if (!activeStoryBeatToast) {
@@ -1492,7 +1522,11 @@ export default function App() {
         </div>
       </footer>
 
-      {isIntroOpen ? (
+      {isPersonaSelectionOpen ? (
+        <PersonaSelectOverlay options={PERSONA_OPTIONS} onSelect={chooseHero} />
+      ) : null}
+
+      {!isPersonaSelectionOpen && isIntroOpen ? (
         <IntroOverlay
           entries={arrivalStoryEntries}
           heroName={heroCard?.name ?? null}
@@ -1502,11 +1536,11 @@ export default function App() {
         />
       ) : null}
 
-      {activeRevealSlot ? (
+      {!isPersonaSelectionOpen && activeRevealSlot ? (
         <SlotRevealOverlay slot={activeRevealSlot} onClose={handleRevealClose} />
       ) : null}
 
-      {activeCardReveal ? (
+      {!isPersonaSelectionOpen && activeCardReveal ? (
         <CardRevealOverlay card={activeCardReveal} onClose={handleCardRevealClose} />
       ) : null}
 
@@ -1532,7 +1566,7 @@ export default function App() {
           </div>
         </div>
       ) : null}
-      {activeStoryBeatToast ? (
+      {!isPersonaSelectionOpen && activeStoryBeatToast ? (
         <div className="story-toast-layer">
           <div className="story-toast" role="status" aria-live="polite">
             <p className="story-toast__message">{activeStoryBeatToast}</p>

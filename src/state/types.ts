@@ -105,7 +105,7 @@ export interface Discovery {
 
 export interface GameState {
   cycle: number;
-  heroCardId: string;
+  heroCardId: string | null;
   cards: Record<string, CardInstance>;
   hand: string[];
   slots: Record<string, Slot>;

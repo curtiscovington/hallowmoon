@@ -2219,6 +2219,222 @@ button {
   outline-offset: 2px;
 }
 
+.persona-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1.5rem, 5vw, 3.5rem);
+  z-index: 270;
+}
+
+.persona-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 20%, rgba(94, 72, 188, 0.35), transparent 55%),
+    radial-gradient(circle at 75% 80%, rgba(28, 118, 186, 0.35), transparent 58%),
+    rgba(10, 6, 22, 0.86);
+  backdrop-filter: blur(22px);
+}
+
+.persona-overlay__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(96vw, 960px);
+  border-radius: 1.6rem;
+  border: 1px solid rgba(198, 180, 255, 0.45);
+  background: linear-gradient(180deg, rgba(40, 24, 78, 0.95), rgba(12, 14, 32, 0.97));
+  box-shadow: 0 34px 60px rgba(6, 4, 18, 0.65);
+  padding: clamp(1.8rem, 4vw, 2.6rem);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.5rem, 3vw, 2.2rem);
+  color: #f6f2ff;
+}
+
+.persona-overlay__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.persona-overlay__eyebrow {
+  margin: 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: rgba(202, 188, 255, 0.72);
+}
+
+.persona-overlay__title {
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.persona-overlay__prologue {
+  display: grid;
+  gap: 0.5rem;
+  font-size: clamp(0.95rem, 2.4vw, 1.05rem);
+  color: rgba(226, 216, 255, 0.82);
+}
+
+.persona-overlay__prologue p {
+  margin: 0;
+}
+
+.persona-overlay__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: clamp(1rem, 3vw, 1.5rem);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.persona-overlay__item {
+  display: contents;
+}
+
+.persona-card {
+  position: relative;
+  border: 1px solid rgba(210, 198, 255, 0.35);
+  border-radius: 1.35rem;
+  padding: clamp(1.5rem, 4vw, 1.9rem);
+  background: linear-gradient(180deg, rgba(32, 20, 60, 0.92), rgba(14, 10, 28, 0.94));
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  isolation: isolate;
+  transition: transform 240ms ease, box-shadow 240ms ease, border-color 200ms ease;
+}
+
+.persona-card__glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 220ms ease;
+  filter: blur(0);
+  z-index: -1;
+}
+
+.persona-card__body {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.persona-card__glyph {
+  font-size: clamp(2rem, 5vw, 2.6rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  background: rgba(244, 238, 255, 0.14);
+  backdrop-filter: blur(6px);
+}
+
+.persona-card__name {
+  font-size: clamp(1.3rem, 3vw, 1.6rem);
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.persona-card__summary {
+  font-size: 0.95rem;
+  color: rgba(226, 214, 255, 0.85);
+}
+
+.persona-card__quote {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  font-style: italic;
+  color: rgba(248, 242, 255, 0.92);
+}
+
+.persona-card__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.78rem;
+  color: rgba(254, 248, 255, 0.88);
+}
+
+.persona-card:hover,
+.persona-card:focus-visible {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 42px rgba(12, 6, 38, 0.5);
+  border-color: rgba(255, 240, 220, 0.45);
+}
+
+.persona-card:hover .persona-card__glow,
+.persona-card:focus-visible .persona-card__glow {
+  opacity: 1;
+}
+
+.persona-card:focus-visible {
+  outline: 2px solid rgba(255, 240, 220, 0.68);
+  outline-offset: 3px;
+}
+
+.persona-card--watcher {
+  background: linear-gradient(180deg, rgba(32, 28, 72, 0.96), rgba(14, 10, 34, 0.94));
+}
+
+.persona-card--watcher .persona-card__glow {
+  background: radial-gradient(circle at 50% -10%, rgba(130, 188, 255, 0.35), transparent 70%),
+    radial-gradient(circle at 120% 120%, rgba(102, 70, 214, 0.38), transparent 62%);
+}
+
+.persona-card--weaver {
+  background: linear-gradient(185deg, rgba(44, 20, 70, 0.96), rgba(20, 12, 42, 0.94));
+}
+
+.persona-card--weaver .persona-card__glow {
+  background: radial-gradient(circle at -10% 40%, rgba(196, 128, 255, 0.38), transparent 68%),
+    radial-gradient(circle at 90% 110%, rgba(86, 212, 226, 0.34), transparent 60%);
+}
+
+.persona-card--outcast {
+  background: linear-gradient(182deg, rgba(36, 18, 52, 0.97), rgba(12, 10, 30, 0.95));
+}
+
+.persona-card--outcast .persona-card__glow {
+  background: radial-gradient(circle at 10% 0%, rgba(255, 178, 120, 0.32), transparent 60%),
+    radial-gradient(circle at 110% 120%, rgba(142, 76, 192, 0.36), transparent 65%);
+}
+
+@media (max-width: 640px) {
+  .persona-overlay__dialog {
+    width: min(96vw, 720px);
+    gap: 1.8rem;
+  }
+
+  .persona-card {
+    padding: clamp(1.3rem, 5vw, 1.6rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .persona-card,
+  .persona-card__glow {
+    transition: none;
+  }
+}
+
 .intro-overlay {
   position: fixed;
   inset: 0;

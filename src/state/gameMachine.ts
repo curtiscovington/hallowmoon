@@ -1,7 +1,7 @@
 import { CardInstance, Discovery, DiscoverySeed, GameState, Resources, Slot, SlotRepair } from './types';
 import {
   CardTemplate,
-  HERO_TEMPLATE,
+  HERO_PERSONA_TEMPLATES,
   OPPORTUNITY_TEMPLATES,
   SLOT_ACTION_COMPLETION_TOLERANCE_MS,
   SLOT_LOCK_BASE_MS,
@@ -69,6 +69,10 @@ function instantiateSlot(template: SlotTemplate, id?: string): Slot {
   };
 }
 
+const HERO_TEMPLATE_BY_KEY = new Map(
+  HERO_PERSONA_TEMPLATES.map((template) => [template.key, template])
+);
+
 function randomFrom<T>(options: readonly T[]): T {
   return options[Math.floor(randomSource() * options.length)];
 }
@@ -78,7 +82,6 @@ function baseResources(): Resources {
 }
 
 function initialState(): GameState {
-  const hero = instantiateCard(HERO_TEMPLATE);
   const whisper = instantiateCard(OPPORTUNITY_TEMPLATES[0]);
   const slots: Record<string, Slot> = {};
   const manorSlot = instantiateSlot(SLOT_TEMPLATES.manor);
@@ -87,12 +90,11 @@ function initialState(): GameState {
 
   return {
     cycle: 1,
-    heroCardId: hero.id,
+    heroCardId: null,
     cards: {
-      [hero.id]: hero,
       [whisper.id]: whisper
     },
-    hand: [hero.id, whisper.id],
+    hand: [whisper.id],
     slots,
     resources: baseResources(),
     log: buildStoryLog('arrival'),
@@ -104,6 +106,7 @@ function initialState(): GameState {
 }
 
 export type GameAction =
+  | { type: 'CHOOSE_HERO'; templateKey: string }
   | { type: 'MOVE_CARD_TO_SLOT'; cardId: string; slotId: string }
   | { type: 'RECALL_CARD'; cardId: string }
   | { type: 'ACTIVATE_SLOT'; slotId: string }
@@ -531,6 +534,29 @@ function activateSlot(state: GameState, slotId: string): SlotActionResult {
 
 function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
+    case 'CHOOSE_HERO': {
+      if (state.heroCardId) {
+        return state;
+      }
+      const template = HERO_TEMPLATE_BY_KEY.get(action.templateKey);
+      if (!template) {
+        return state;
+      }
+
+      const hero = instantiateCard(template);
+      const updatedHand = addToHand(state.hand, hero.id);
+
+      return {
+        ...state,
+        heroCardId: hero.id,
+        cards: {
+          ...state.cards,
+          [hero.id]: hero
+        },
+        hand: updatedHand,
+        log: appendLog(state.log, `${hero.name} accepts the mantle. Your intent takes shape.`)
+      };
+    }
     case 'MOVE_CARD_TO_SLOT': {
       const card = state.cards[action.cardId];
       const slot = state.slots[action.slotId];
