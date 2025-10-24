@@ -2227,6 +2227,7 @@ button {
   justify-content: center;
   padding: clamp(1.5rem, 5vw, 3.5rem);
   z-index: 270;
+  overflow-y: auto;
 }
 
 .persona-overlay__backdrop {
@@ -2418,9 +2419,16 @@ button {
 }
 
 @media (max-width: 640px) {
+  .persona-overlay {
+    align-items: flex-start;
+    justify-content: center;
+    padding: clamp(1.2rem, 6vw, 2.4rem);
+  }
+
   .persona-overlay__dialog {
     width: min(96vw, 720px);
     gap: 1.8rem;
+    margin: clamp(1.4rem, 8vw, 2.6rem) auto;
   }
 
   .persona-card {
