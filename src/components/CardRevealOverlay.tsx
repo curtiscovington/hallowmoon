@@ -1,24 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CardInstance } from '../state/types';
+import { useDisableBodyScroll } from '../hooks/useDisableBodyScroll';
 
 interface CardRevealOverlayProps {
   card: CardInstance;
   onClose: () => void;
-}
-
-function useDisableBodyScroll() {
-  useEffect(() => {
-    if (typeof document === 'undefined') {
-      return () => undefined;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, []);
 }
 
 export function CardRevealOverlay({ card, onClose }: CardRevealOverlayProps) {

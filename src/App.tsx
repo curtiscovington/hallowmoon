@@ -3,6 +3,7 @@ import {
   DragEvent,
   KeyboardEvent,
   ReactNode,
+  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -16,6 +17,7 @@ import { SlotRevealOverlay } from './components/SlotRevealOverlay';
 import { CardRevealOverlay } from './components/CardRevealOverlay';
 import { SlotMap } from './components/SlotMap';
 import { SlotDetailsOverlay } from './components/SlotDetailsOverlay';
+import { IntroOverlay } from './components/IntroOverlay';
 import { formatDuration } from './utils/time';
 import {
   MAP_DEFINITIONS,
@@ -29,7 +31,7 @@ import {
   buildSlotSummaries,
   type SlotSummary
 } from './state/selectors/slots';
-import { isStoryBeatEntry } from './content/storyBeats';
+import { getStoryBeatEntries, isStoryBeatEntry } from './content/storyBeats';
 
 const CARD_DRAG_TYPE = 'application/x-hallowmoon-card';
 
@@ -847,6 +849,9 @@ export default function App() {
   const [activeSlotModalId, setActiveSlotModalId] = useState<string | null>(null);
   const [isChronicleOpen, setIsChronicleOpen] = useState(false);
   const [isHandOpen, setIsHandOpen] = useState(isDesktop);
+  const arrivalStoryEntries = useMemo(() => getStoryBeatEntries('arrival'), []);
+  const arrivalStoryEntrySet = useMemo(() => new Set(arrivalStoryEntries), [arrivalStoryEntries]);
+  const [isIntroOpen, setIsIntroOpen] = useState(arrivalStoryEntries.length > 0);
   const handPanelId = useId();
   const slotModalTitleId = useId();
   const slotModalDescriptionId = useId();
@@ -858,12 +863,20 @@ export default function App() {
   const manualPauseRef = useRef(false);
   const autoPausedByRevealRef = useRef(false);
   const storyBeatToastTimerRef = useRef<number | null>(null);
+  const introPauseAppliedRef = useRef(false);
   const previousLogRef = useRef<string[]>([]);
+  const heroCard = useMemo(
+    () => (state.heroCardId ? state.cards[state.heroCardId] ?? null : null),
+    [state.cards, state.heroCardId]
+  );
 
-  const setPausedManual = (value: boolean) => {
-    manualPauseRef.current = value;
-    setIsPausedState(value);
-  };
+  const setPausedManual = useCallback(
+    (value: boolean) => {
+      manualPauseRef.current = value;
+      setIsPausedState(value);
+    },
+    [setIsPausedState]
+  );
 
   const setPausedAuto = (value: boolean) => {
     setIsPausedState(value);
@@ -892,6 +905,18 @@ export default function App() {
   useEffect(() => {
     setTimeScale(isPaused ? 0 : speed);
   }, [isPaused, setTimeScale, speed]);
+
+  useEffect(() => {
+    if (!isIntroOpen) {
+      introPauseAppliedRef.current = false;
+      return;
+    }
+
+    if (!introPauseAppliedRef.current) {
+      introPauseAppliedRef.current = true;
+      setPausedManual(true);
+    }
+  }, [isIntroOpen, setPausedManual]);
 
   useEffect(() => {
     const previousIds = previousSlotIdsRef.current;
@@ -931,22 +956,25 @@ export default function App() {
 
     if (newEntries.length > 0) {
       const newStoryEntries = newEntries.filter((entry) => isStoryBeatEntry(entry));
-      if (newStoryEntries.length > 0) {
-        setStoryBeatQueue((queue) => [...queue, ...newStoryEntries]);
+      const filteredEntries = newStoryEntries.filter((entry) =>
+        !(isIntroOpen && arrivalStoryEntrySet.has(entry))
+      );
+      if (filteredEntries.length > 0) {
+        setStoryBeatQueue((queue) => [...queue, ...filteredEntries]);
       }
     }
 
     previousLogRef.current = currentLog;
-  }, [state.log]);
+  }, [arrivalStoryEntrySet, isIntroOpen, state.log]);
 
   useEffect(() => {
-    if (activeStoryBeatToast || storyBeatQueue.length === 0) {
+    if (isIntroOpen || activeStoryBeatToast || storyBeatQueue.length === 0) {
       return;
     }
 
     setActiveStoryBeatToast(storyBeatQueue[0]);
     setStoryBeatQueue((queue) => queue.slice(1));
-  }, [activeStoryBeatToast, storyBeatQueue]);
+  }, [activeStoryBeatToast, isIntroOpen, storyBeatQueue]);
 
   useEffect(() => {
     if (!activeStoryBeatToast) {
@@ -965,6 +993,21 @@ export default function App() {
       }
     };
   }, [activeStoryBeatToast]);
+
+  useEffect(() => {
+    if (!isIntroOpen) {
+      return;
+    }
+
+    if (activeStoryBeatToast && arrivalStoryEntrySet.has(activeStoryBeatToast)) {
+      setActiveStoryBeatToast(null);
+    }
+
+    setStoryBeatQueue((queue) => {
+      const filtered = queue.filter((entry) => !arrivalStoryEntrySet.has(entry));
+      return filtered.length === queue.length ? queue : filtered;
+    });
+  }, [activeStoryBeatToast, arrivalStoryEntrySet, isIntroOpen]);
 
   useEffect(() => {
     const pendingCardReveals = state.pendingReveals.length;
@@ -1023,6 +1066,14 @@ export default function App() {
   );
 
   const slots = useMemo(() => Object.values(state.slots), [state.slots]);
+  const manorSlot = useMemo(
+    () => slots.find((slot) => slot.key === MANOR_ROOT_SLOT_KEY) ?? null,
+    [slots]
+  );
+  const fleetingCard = useMemo(
+    () => handCards.find((card) => !card.permanent && card.traits.includes('fleeting')) ?? null,
+    [handCards]
+  );
 
   const locationExplorationAvailability = useMemo(
     () => buildLocationExplorationAvailability(slots),
@@ -1440,6 +1491,16 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {isIntroOpen ? (
+        <IntroOverlay
+          entries={arrivalStoryEntries}
+          heroName={heroCard?.name ?? null}
+          manorName={manorSlot?.name ?? null}
+          fleetingCardName={fleetingCard?.name ?? null}
+          onClose={() => setIsIntroOpen(false)}
+        />
+      ) : null}
 
       {activeRevealSlot ? (
         <SlotRevealOverlay slot={activeRevealSlot} onClose={handleRevealClose} />
