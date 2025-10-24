@@ -11,7 +11,7 @@ const STORY_BEATS: Record<StoryBeatKey, StoryBeat> = {
     entries: [
       'Night gathers as you step from the winding forest path and the manor reveals itself at last.',
       'Ancient pines hem the clearing, their needles whispering with secrets carried on the mist.',
-      'The manor\'s doors groan open just enough to invite you inside, promising dust-drowned memories waiting to be stirred.'
+      "The manor's doors groan open just enough to invite you inside, promising dust-drowned memories waiting to be stirred."
     ]
   }
 };
