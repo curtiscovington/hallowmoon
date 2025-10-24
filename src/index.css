@@ -2536,30 +2536,6 @@ button {
   color: rgba(245, 240, 255, 0.9);
 }
 
-.intro-overlay__orientation {
-  display: grid;
-  gap: 1rem;
-}
-
-.intro-overlay__list {
-  margin: 0;
-  padding-left: 1.2rem;
-  display: grid;
-  gap: 0.9rem;
-  font-size: 1rem;
-}
-
-.intro-overlay__list-item h3 {
-  margin: 0 0 0.3rem;
-  font-size: 1.05rem;
-}
-
-.intro-overlay__list-item p {
-  margin: 0;
-  color: rgba(235, 229, 255, 0.84);
-  line-height: 1.55;
-}
-
 .intro-overlay__actions {
   display: flex;
   justify-content: space-between;

@@ -5,7 +5,6 @@ interface IntroOverlayProps {
   entries: string[];
   heroName: string | null;
   manorName: string | null;
-  fleetingCardName: string | null;
   onClose: () => void;
 }
 
@@ -13,39 +12,29 @@ export function IntroOverlay({
   entries,
   heroName,
   manorName,
-  fleetingCardName,
   onClose
 }: IntroOverlayProps) {
-  const totalSlides = entries.length + 1;
+  const closingEntry = useMemo(() => {
+    if (heroName && manorName) {
+      return `${heroName} pauses within ${manorName}, sensing stories quicken in the hush.`;
+    }
+    if (heroName) {
+      return `${heroName} pauses within the manor, sensing stories quicken in the hush.`;
+    }
+    if (manorName) {
+      return `You pause within ${manorName}, sensing stories quicken in the hush.`;
+    }
+    return 'You pause within the manor, sensing stories quicken in the hush.';
+  }, [heroName, manorName]);
+  const slides = useMemo(() => [...entries, closingEntry], [entries, closingEntry]);
+  const totalSlides = slides.length;
   const [activeIndex, setActiveIndex] = useState(0);
   const dialogTitleId = useId();
   const bodyId = useId();
   const primaryButtonRef = useRef<HTMLButtonElement | null>(null);
   const hasPrevious = activeIndex > 0;
-  const onFinalSlide = activeIndex >= entries.length;
-  const progressLabel = `Step ${activeIndex + 1} of ${totalSlides}`;
-  const heroLabel = heroName ?? 'your caretaker';
-  const manorLabel = manorName ?? 'the manor';
-  const fleetingLabel = fleetingCardName ?? 'your fleeting card';
-
-  const orientationItems = useMemo(
-    () => [
-      {
-        title: 'Scout the estate',
-        description: `Drag ${heroLabel} onto ${manorLabel} to begin exploring and reveal new rooms.`
-      },
-      {
-        title: 'Spend fleeting insights',
-        description: `${fleetingLabel} will fade after a few cycles. Study it as soon as you uncover a desk.`
-      },
-      {
-        title: 'Control the tempo',
-        description:
-          'Use the pause and speed controls above the board to plan between cycles. The chronicle drawer tracks the story so you can review it later.'
-      }
-    ],
-    [fleetingLabel, heroLabel, manorLabel]
-  );
+  const onFinalSlide = activeIndex >= totalSlides - 1;
+  const progressLabel = `Verse ${activeIndex + 1} of ${totalSlides}`;
 
   useDisableBodyScroll();
 
@@ -108,24 +97,14 @@ export function IntroOverlay({
           </button>
         </header>
         <div id={bodyId} className="intro-overlay__body">
-          {onFinalSlide ? (
-            <div className="intro-overlay__orientation">
-              <h2 className="intro-overlay__title">Your first moves</h2>
-              <ol className="intro-overlay__list">
-                {orientationItems.map((item) => (
-                  <li key={item.title} className="intro-overlay__list-item">
-                    <h3>{item.title}</h3>
-                    <p>{item.description}</p>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          ) : (
-            <article className="intro-overlay__story">
-              <h2 className="intro-overlay__title">Welcome to Hollowmoon Manor</h2>
-              <p>{entries[activeIndex]}</p>
-            </article>
-          )}
+          <article className="intro-overlay__story">
+            <h2 className="intro-overlay__title">
+              {onFinalSlide ? 'The hush before the work' : 'Welcome to Hollowmoon Manor'}
+            </h2>
+            {slides[activeIndex].split('\n\n').map((paragraph, index) => (
+              <p key={index}>{paragraph}</p>
+            ))}
+          </article>
         </div>
         <footer className="intro-overlay__actions">
           <button
@@ -142,7 +121,7 @@ export function IntroOverlay({
             className="intro-overlay__button"
             onClick={handleAdvance}
           >
-            {onFinalSlide ? 'Begin caretaking' : 'Continue'}
+            {onFinalSlide ? 'Enter the manor' : 'Continue'}
           </button>
         </footer>
       </div>
