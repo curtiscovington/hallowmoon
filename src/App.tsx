@@ -868,6 +868,7 @@ export default function App() {
   const autoPausedByRevealRef = useRef(false);
   const storyBeatToastTimerRef = useRef<number | null>(null);
   const introPauseAppliedRef = useRef(false);
+  const hasPersonaSelectionInitializedRef = useRef(false);
   const previousLogRef = useRef<string[]>([]);
   const heroCard = useMemo(
     () => (state.heroCardId ? state.cards[state.heroCardId] ?? null : null),
@@ -943,8 +944,14 @@ export default function App() {
 
   useEffect(() => {
     if (!isPersonaSelectionOpen) {
+      hasPersonaSelectionInitializedRef.current = true;
       return;
     }
+
+    if (!hasPersonaSelectionInitializedRef.current) {
+      return;
+    }
+
     setPausedManual(true);
   }, [isPersonaSelectionOpen, setPausedManual]);
 
