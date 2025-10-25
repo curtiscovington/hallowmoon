@@ -113,6 +113,7 @@ describe('buildSlotSummaries', () => {
     expect(summary.canExploreLocation).toBe(false);
     expect(summary.isSlotInteractive).toBe(false);
     expect(summary.isLocked).toBe(true);
+    expect(summary.isResolving).toBe(false);
     expect(summary.lockRemainingMs).toBe(12_000);
     expect(summary.lockTotalMs).toBe(30_000);
     expect(summary.actionLabel).toBe('Explore');
@@ -152,5 +153,37 @@ describe('buildSlotSummaries', () => {
     expect(summary.availabilityNote).toBe(
       'All discoverable opportunities have been secured here for now.'
     );
+  });
+
+  it('treats pending slot actions as non-interactive but not locked', () => {
+    const now = 3_000_000;
+    const slotId = 'slot-manor-pending';
+    const baseSlot = createSlotFromTemplate('manor', { id: slotId });
+
+    const hero = createCardInstance(HERO_TEMPLATE, 'card-hero-pending', { area: 'slot', slotId });
+
+    const slot: Slot = {
+      ...baseSlot,
+      occupantId: hero.id,
+      pendingAction: { type: 'explore-location', location: baseSlot.location }
+    };
+
+    const summaries = buildSlotSummaries({
+      slots: [slot],
+      cards: {
+        [hero.id]: hero
+      },
+      heroCardId: hero.id,
+      resources: { coin: 0, lore: 0, glimmer: 0 },
+      pausedAt: null,
+      locationAvailability: { manor: true },
+      now
+    });
+
+    const summary = summaries[slotId];
+
+    expect(summary.isLocked).toBe(false);
+    expect(summary.isResolving).toBe(true);
+    expect(summary.isSlotInteractive).toBe(false);
   });
 });
