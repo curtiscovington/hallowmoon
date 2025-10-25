@@ -49,6 +49,9 @@ interface SlotMapProps {
   onActivateSlot: (slotId: string) => void;
   onDropCard: (cardId: string, slotId: string) => void;
   draggedCard: CardInstance | null;
+  onCardDragStart: (cardId: string) => void;
+  onCardDragEnd: () => void;
+  cardDragMimeType: string;
 }
 
 interface MarkerData {
@@ -75,7 +78,10 @@ export function SlotMap({
   onOpenSlotDetails,
   onActivateSlot,
   onDropCard,
-  draggedCard
+  draggedCard,
+  onCardDragStart,
+  onCardDragEnd,
+  cardDragMimeType
 }: SlotMapProps) {
   const map = MAP_DEFINITIONS[mapId];
   const [scale, setScale] = useState(1);
@@ -99,13 +105,14 @@ export function SlotMap({
         }
         const summary = slotSummaries[slot.id] ?? null;
         const locked = !slot.unlocked || Boolean(summary?.isLocked);
+        const resolving = Boolean(summary?.isResolving);
         return {
           slot,
           anchor,
           summary,
           locked,
           damaged: slot.state === 'damaged',
-          resolving: Boolean(slot.pendingAction)
+          resolving
         } satisfies MarkerData;
       })
       .filter((value): value is MarkerData => value !== null)
@@ -137,7 +144,7 @@ export function SlotMap({
         setHoveredSlotId(null);
         return;
       }
-      const cardId = event.dataTransfer?.getData('application/x-hallowmoon-card');
+      const cardId = event.dataTransfer?.getData(cardDragMimeType);
       if (!cardId) {
         return;
       }
@@ -145,7 +152,7 @@ export function SlotMap({
       setHoveredSlotId(null);
       onDropCard(cardId, slotId);
     },
-    [canDropOnSlot, markers, onDropCard]
+    [canDropOnSlot, cardDragMimeType, markers, onDropCard]
   );
 
   const clampScale = useCallback((next: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next)), []);
@@ -243,6 +250,7 @@ export function SlotMap({
       const isDroppable = Boolean(draggedCard && canDropOnSlot(slot, summary));
       const showDraggedPreview = Boolean(isHovered && isDroppable && draggedCard);
       const occupant = summary?.occupant ?? null;
+      const canDragOccupant = Boolean(occupant && slot.unlocked && !locked && !resolving);
       const previewCard = showDraggedPreview ? draggedCard : occupant;
       const placeholderState: MarkerPlaceholderState = !slot.unlocked
         ? 'locked'
@@ -347,6 +355,7 @@ export function SlotMap({
             data-slot-id={slot.id}
             className="slot-map__marker-button"
             onClick={() => handleMarkerClick(slot.id)}
+            draggable={canDragOccupant}
             onDragOver={(event) => {
               if (!draggedCard || !canDropOnSlot(slot, summary)) {
                 return;
@@ -373,6 +382,23 @@ export function SlotMap({
               setHoveredSlotId((current) => (current === slot.id ? null : current));
             }}
             onDrop={(event) => handleMarkerDrop(slot.id, event)}
+            onDragStart={(event) => {
+              if (!canDragOccupant || !occupant) {
+                event.preventDefault();
+                return;
+              }
+              event.dataTransfer?.setData(cardDragMimeType, occupant.id);
+              event.dataTransfer.effectAllowed = 'move';
+              setHoveredSlotId(null);
+              onCardDragStart(occupant.id);
+            }}
+            onDragEnd={() => {
+              if (!canDragOccupant) {
+                return;
+              }
+              setHoveredSlotId(null);
+              onCardDragEnd();
+            }}
             aria-pressed={isSelected}
             aria-label={`${slot.name} — ${statusParts.join(', ')}`}
           >
@@ -436,6 +462,7 @@ export function SlotMap({
     });
   }, [
     availableMaps,
+    cardDragMimeType,
     canDropOnSlot,
     draggedCard,
     handleMarkerClick,
@@ -444,6 +471,8 @@ export function SlotMap({
     mapId,
     markers,
     onActivateSlot,
+    onCardDragEnd,
+    onCardDragStart,
     onFocusSlot,
     onMapChange,
     selectedSlotId

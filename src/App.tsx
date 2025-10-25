@@ -293,7 +293,8 @@ function SlotView({
   const lockTotalMs = slot.lockDurationMs ?? null;
   const displayLockRemainingMs = Math.max(0, Math.round(lockRemainingMs * timing.timeScale));
   const isSlotLocked = Boolean(slot.lockedUntil && lockRemainingMs > 0);
-  const isSlotInteractive = slot.unlocked && !isSlotLocked;
+  const isSlotResolving = Boolean(slot.pendingAction);
+  const isSlotInteractive = slot.unlocked && !isSlotLocked && !isSlotResolving;
   const upgradeDisabled =
     !isSlotInteractive || slot.state === 'damaged' || slot.upgradeCost === 0;
   const showLockTimer = isSlotLocked && lockRemainingMs > 0;
@@ -334,7 +335,7 @@ function SlotView({
   if (!slot.unlocked) {
     slotClasses.push('slot-card--locked');
   }
-  if (isSlotLocked) {
+  if (isSlotLocked || isSlotResolving) {
     slotClasses.push('slot-card--busy');
   }
   if (isDragOver && isSlotInteractive) {
@@ -525,7 +526,7 @@ function SlotView({
   if (!slot.unlocked) {
     dropzoneClasses.push('slot-card__dropzone--locked');
   }
-  if (isSlotLocked) {
+  if (isSlotLocked || isSlotResolving) {
     dropzoneClasses.push('slot-card__dropzone--busy');
   }
   if (occupant) {
@@ -544,17 +545,28 @@ function SlotView({
       ? `${stackSize} card${stackSize === 1 ? '' : 's'}: ${[occupant.name, ...attachments.map((card) => card.name)].join(', ')}`
       : null;
 
-  const canDragOccupant = slot.unlocked && !isSlotLocked;
+  const canDragOccupant = slot.unlocked && !isSlotLocked && !isSlotResolving;
 
-  const dropzoneLabel = !isSlotInteractive
-    ? `${slot.name} is not accepting cards right now`
-    : hasSelectedCard
-    ? `Assign ${selectedCardName ?? 'selected card'} to ${slot.name}`
-    : occupant
-    ? canActivateSlot
-      ? `${actionLabel ?? 'Activate'} ${slot.name}`
-      : `${slot.name} cannot be activated right now`
-    : `Assign a card to ${slot.name}`;
+  const dropzoneLabel = (() => {
+    if (!slot.unlocked) {
+      return `${slot.name} is not accepting cards right now`;
+    }
+    if (isSlotLocked) {
+      return `${slot.name} is not accepting cards right now`;
+    }
+    if (isSlotResolving) {
+      return `${slot.name} is resolving an action`;
+    }
+    if (hasSelectedCard) {
+      return `Assign ${selectedCardName ?? 'selected card'} to ${slot.name}`;
+    }
+    if (occupant) {
+      return canActivateSlot
+        ? `${actionLabel ?? 'Activate'} ${slot.name}`
+        : `${slot.name} cannot be activated right now`;
+    }
+    return `Assign a card to ${slot.name}`;
+  })();
 
   function handlePrimaryClick() {
     if (!isSlotInteractive) {
@@ -585,7 +597,7 @@ function SlotView({
         className="slot-card__action"
         type="button"
         onClick={() => onRecall(assistant.id)}
-        disabled={isSlotLocked}
+        disabled={isSlotLocked || isSlotResolving}
       >
         {`Recall ${assistant.name}`}
       </button>,
@@ -599,7 +611,7 @@ function SlotView({
         className="slot-card__action"
         type="button"
         onClick={() => onRecall(occupant.id)}
-        disabled={isSlotLocked}
+        disabled={isSlotLocked || isSlotResolving}
       >
         {`Recall ${occupant.name}`}
       </button>,
@@ -1453,6 +1465,9 @@ export default function App() {
             onActivateSlot={activateSlot}
             onDropCard={handleSlotDrop}
             draggedCard={draggedCard}
+            onCardDragStart={handleCardDragStart}
+            onCardDragEnd={handleCardDragEnd}
+            cardDragMimeType={CARD_DRAG_TYPE}
           />
         </section>
         {isDesktop ? (

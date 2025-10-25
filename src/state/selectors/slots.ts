@@ -11,6 +11,7 @@ export interface SlotSummary {
   canExploreLocation: boolean;
   isSlotInteractive: boolean;
   isLocked: boolean;
+  isResolving: boolean;
   actionLabel: string | null;
   canActivate: boolean;
   availabilityNote: string | null;
@@ -96,7 +97,8 @@ export function buildSlotSummaries({
       : 0;
     const lockTotalMs = slot.lockDurationMs ?? null;
     const isLocked = Boolean(slot.lockedUntil && lockRemainingMs > 0);
-    const isSlotInteractive = slot.unlocked && !isLocked;
+    const isResolving = Boolean(slot.pendingAction);
+    const isSlotInteractive = slot.unlocked && !isLocked && !isResolving;
 
     const actionMetadata = getSlotActionMetadata({
       slot,
@@ -116,6 +118,7 @@ export function buildSlotSummaries({
       canExploreLocation: canExplore,
       isSlotInteractive,
       isLocked,
+      isResolving,
       actionLabel: actionMetadata.actionLabel,
       canActivate: actionMetadata.canActivate,
       availabilityNote: actionMetadata.availabilityNote,
